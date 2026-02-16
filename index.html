@@ -1,0 +1,219 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Robot Field (96" x 60")</title>
+
+<style>
+  body {
+    font-family: system-ui, Arial, sans-serif;
+    margin: 20px;
+  }
+
+  #field {
+    width: 960px;
+    height: 600px;
+    border: 3px solid #111;
+    position: relative;
+    user-select: none;
+
+    background-image: url("carpet.png");
+    background-size: 960px 600px;
+    background-repeat: no-repeat;
+    background-position: center;
+  }
+
+  /* SVG path layer */
+  #lines {
+    position: absolute;
+    left: 0;
+    top: 0;
+    z-index: 1;
+    pointer-events: none;
+  }
+
+.pt {
+  position: absolute;
+  width: 20px;
+  height: 20px;
+  background: rgb(43, 250, 6);
+  border-radius: 50%;
+  transform: translate(-10px, -10px);
+  z-index: 2;
+  cursor: pointer;
+}
+
+.label {
+  position: absolute;
+  transform: translate(12px, -12px);
+  font-size: 12px;
+  background: rgba(255,255,255,0.9);
+  padding: 3px 6px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  white-space: nowrap;
+
+  opacity: 0;                 /* hidden by default */
+  transition: opacity 0.15s;  /* smooth fade */
+  pointer-events: none;
+}
+
+/* Show label only on hover */
+.pt:hover .label {
+  opacity: 1;
+}
+
+
+  textarea {
+    width: 960px;
+    height: 150px;
+    margin-top: 10px;
+  }
+
+  button {
+    margin-right: 8px;
+  }
+
+  .hint {
+    color: #444;
+    margin: 8px 0 12px;
+  }
+</style>
+</head>
+
+<body>
+
+<h2>Robot Field (96" x 60")</h2>
+
+<div class="hint">
+Click to add a waypoint. Click near a dot to delete it.
+Coordinates are in <b>inches</b>. (0,0) is bottom-left.
+</div>
+
+<div id="field">
+  <svg id="lines" width="960" height="600"></svg>
+</div>
+
+<div style="margin-top:10px;">
+  <button id="undo">Undo</button>
+  <button id="clear">Clear</button>
+  <button id="copy">Copy JSON</button>
+</div>
+
+<textarea id="out" readonly></textarea>
+
+<script>
+const FIELD_W_IN = 96;
+const FIELD_H_IN = 60;
+const PX_PER_IN = 10;
+const DELETE_RADIUS_IN = 2;
+
+const field = document.getElementById("field");
+const lines = document.getElementById("lines");
+const out = document.getElementById("out");
+
+const pts = [];
+
+function clamp(v, lo, hi) {
+  return Math.max(lo, Math.min(hi, v));
+}
+
+function render() {
+
+  // Clear SVG lines
+  lines.innerHTML = "";
+
+  // Draw path if at least 2 points
+  if (pts.length >= 2) {
+    const pointsStr = pts.map(p => {
+      const px = p.x * PX_PER_IN;
+      const py = (FIELD_H_IN - p.y) * PX_PER_IN;
+      return `${px},${py}`;
+    }).join(" ");
+
+    const polyline = document.createElementNS("http://www.w3.org/2000/svg", "polyline");
+    polyline.setAttribute("points", pointsStr);
+    polyline.setAttribute("fill", "none");
+    polyline.setAttribute("stroke", "black");
+    polyline.setAttribute("stroke-width", "4");
+    polyline.setAttribute("stroke-linecap", "round");
+    polyline.setAttribute("stroke-linejoin", "round");
+
+    lines.appendChild(polyline);
+  }
+
+  // Remove old dots
+  document.querySelectorAll(".pt").forEach(el => el.remove());
+
+  // Draw dots
+  pts.forEach((p, i) => {
+    const dot = document.createElement("div");
+    dot.className = "pt";
+    dot.style.left = (p.x * PX_PER_IN) + "px";
+    dot.style.top  = ((FIELD_H_IN - p.y) * PX_PER_IN) + "px";
+
+    const label = document.createElement("div");
+    label.className = "label";
+    label.textContent = `${i + 1}: (${p.x.toFixed(1)}, ${p.y.toFixed(1)})`;
+
+    dot.appendChild(label);
+    field.appendChild(dot);
+  });
+
+  // Update JSON output
+  out.value = JSON.stringify(
+    pts.map(p => [Number(p.x.toFixed(2)), Number(p.y.toFixed(2))]),
+    null,
+    2
+  );
+}
+
+field.addEventListener("click", (e) => {
+  const rect = field.getBoundingClientRect();
+  const sx = e.clientX - rect.left;
+  const sy = e.clientY - rect.top;
+
+  let x = sx / PX_PER_IN;
+  let y = FIELD_H_IN - (sy / PX_PER_IN);
+
+  x = clamp(x, 0, FIELD_W_IN);
+  y = clamp(y, 0, FIELD_H_IN);
+
+  // Check for deletion
+  for (let i = 0; i < pts.length; i++) {
+    const dx = pts[i].x - x;
+    const dy = pts[i].y - y;
+    const dist = Math.sqrt(dx * dx + dy * dy);
+    if (dist < DELETE_RADIUS_IN) {
+      pts.splice(i, 1);
+      render();
+      return;
+    }
+  }
+
+  // Add new point
+  pts.push({ x, y });
+  render();
+});
+
+document.getElementById("undo").onclick = () => {
+  pts.pop();
+  render();
+};
+
+document.getElementById("clear").onclick = () => {
+  pts.length = 0;
+  render();
+};
+
+document.getElementById("copy").onclick = async () => {
+  await navigator.clipboard.writeText(out.value);
+  alert("Copied waypoints JSON!");
+};
+
+render();
+</script>
+
+</body>
+</html>
