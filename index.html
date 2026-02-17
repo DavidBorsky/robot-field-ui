@@ -6,10 +6,7 @@
 <title>Robot Field (96" x 60")</title>
 
 <style>
-  body {
-    font-family: system-ui, Arial, sans-serif;
-    margin: 20px;
-  }
+  body { font-family: system-ui, Arial, sans-serif; margin: 20px; }
 
   #field {
     width: 960px;
@@ -24,7 +21,6 @@
     background-position: center;
   }
 
-  /* SVG path layer */
   #lines {
     position: absolute;
     left: 0;
@@ -33,52 +29,50 @@
     pointer-events: none;
   }
 
-.pt {
-  position: absolute;
-  width: 20px;
-  height: 20px;
-  background: rgb(43, 250, 6);
-  border-radius: 50%;
-  transform: translate(-10px, -10px);
-  z-index: 2;
-  cursor: pointer;
-}
+  .pt {
+    position: absolute;
+    width: 20px;
+    height: 20px;
+    background: rgb(43, 250, 6);
+    border-radius: 50%;
+    transform: translate(-10px, -10px);
+    z-index: 2;
+    cursor: grab;
+    touch-action: none; /* important for dragging on mobile */
+  }
 
-.label {
-  position: absolute;
-  transform: translate(12px, -12px);
-  font-size: 12px;
-  background: rgba(255,255,255,0.9);
-  padding: 3px 6px;
-  border: 1px solid #ccc;
-  border-radius: 4px;
-  white-space: nowrap;
+  .pt:active { cursor: grabbing; }
 
-  opacity: 0;                 /* hidden by default */
-  transition: opacity 0.15s;  /* smooth fade */
-  pointer-events: none;
-}
+  .label {
+    position: absolute;
+    transform: translate(12px, -12px);
+    font-size: 12px;
+    background: rgba(255,255,255,0.9);
+    padding: 3px 6px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    white-space: nowrap;
 
-/* Show label only on hover */
-.pt:hover .label {
-  opacity: 1;
-}
+    opacity: 0;
+    transition: opacity 0.15s;
+    pointer-events: none;
+  }
 
+  .pt:hover .label { opacity: 1; }
 
-  textarea {
-    width: 960px;
-    height: 150px;
+  textarea { width: 960px; height: 150px; margin-top: 10px; }
+  button { margin-right: 8px; }
+
+  .hint { color: #444; margin: 8px 0 12px; }
+
+  .row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
     margin-top: 10px;
   }
-
-  button {
-    margin-right: 8px;
-  }
-
-  .hint {
-    color: #444;
-    margin: 8px 0 12px;
-  }
+  .row label { font-size: 14px; color: #222; }
+  .row input[type="range"] { width: 260px; }
 </style>
 </head>
 
@@ -88,11 +82,17 @@
 
 <div class="hint">
 Click to add a waypoint. Click near a dot to delete it.
-Coordinates are in <b>inches</b>. (0,0) is bottom-left.
+Drag a dot to move it. Coordinates are in <b>inches</b>. (0,0) is bottom-left.
 </div>
 
 <div id="field">
   <svg id="lines" width="960" height="600"></svg>
+</div>
+
+<div class="row">
+  <label for="tension">Curve tightness</label>
+  <input id="tension" type="range" min="0.2" max="1.2" step="0.05" value="0.85" />
+  <span id="tensionVal">0.85</span>
 </div>
 
 <div style="margin-top:10px;">
@@ -109,67 +109,32 @@ const FIELD_H_IN = 60;
 const PX_PER_IN = 10;
 const DELETE_RADIUS_IN = 2;
 
+// Drag behavior
+const DRAG_THRESHOLD_PX = 4; // movement before we treat it as drag (not click)
+
 const field = document.getElementById("field");
 const lines = document.getElementById("lines");
 const out = document.getElementById("out");
 
+const tensionSlider = document.getElementById("tension");
+const tensionVal = document.getElementById("tensionVal");
+
 const pts = [];
+
+// A single SVG path element for the curve (easier to update during drag)
+const svgPath = document.createElementNS("http://www.w3.org/2000/svg", "path");
+svgPath.setAttribute("fill", "none");
+svgPath.setAttribute("stroke", "black");
+svgPath.setAttribute("stroke-width", "4");
+svgPath.setAttribute("stroke-linecap", "round");
+svgPath.setAttribute("stroke-linejoin", "round");
+lines.appendChild(svgPath);
 
 function clamp(v, lo, hi) {
   return Math.max(lo, Math.min(hi, v));
 }
 
-function render() {
-
-  // Clear SVG lines
-  lines.innerHTML = "";
-
-  // Draw path if at least 2 points
-  if (pts.length >= 2) {
-    const pointsStr = pts.map(p => {
-      const px = p.x * PX_PER_IN;
-      const py = (FIELD_H_IN - p.y) * PX_PER_IN;
-      return `${px},${py}`;
-    }).join(" ");
-
-    const polyline = document.createElementNS("http://www.w3.org/2000/svg", "polyline");
-    polyline.setAttribute("points", pointsStr);
-    polyline.setAttribute("fill", "none");
-    polyline.setAttribute("stroke", "black");
-    polyline.setAttribute("stroke-width", "4");
-    polyline.setAttribute("stroke-linecap", "round");
-    polyline.setAttribute("stroke-linejoin", "round");
-
-    lines.appendChild(polyline);
-  }
-
-  // Remove old dots
-  document.querySelectorAll(".pt").forEach(el => el.remove());
-
-  // Draw dots
-  pts.forEach((p, i) => {
-    const dot = document.createElement("div");
-    dot.className = "pt";
-    dot.style.left = (p.x * PX_PER_IN) + "px";
-    dot.style.top  = ((FIELD_H_IN - p.y) * PX_PER_IN) + "px";
-
-    const label = document.createElement("div");
-    label.className = "label";
-    label.textContent = `${i + 1}: (${p.x.toFixed(1)}, ${p.y.toFixed(1)})`;
-
-    dot.appendChild(label);
-    field.appendChild(dot);
-  });
-
-  // Update JSON output
-  out.value = JSON.stringify(
-    pts.map(p => [Number(p.x.toFixed(2)), Number(p.y.toFixed(2))]),
-    null,
-    2
-  );
-}
-
-field.addEventListener("click", (e) => {
+function getFieldInchesFromEvent(e) {
   const rect = field.getBoundingClientRect();
   const sx = e.clientX - rect.left;
   const sy = e.clientY - rect.top;
@@ -179,32 +144,194 @@ field.addEventListener("click", (e) => {
 
   x = clamp(x, 0, FIELD_W_IN);
   y = clamp(y, 0, FIELD_H_IN);
+  return { x, y };
+}
 
-  // Check for deletion
+// inches -> px (with Y flip)
+function toPx(pIn) {
+  return {
+    x: pIn.x * PX_PER_IN,
+    y: (FIELD_H_IN - pIn.y) * PX_PER_IN
+  };
+}
+
+function catmullRomPathD(pointsPx, tension = 0.85) {
+  if (pointsPx.length === 0) return "";
+  if (pointsPx.length === 1) return `M ${pointsPx[0].x} ${pointsPx[0].y}`;
+
+  const t = tension;
+  let d = `M ${pointsPx[0].x} ${pointsPx[0].y}`;
+
+  for (let i = 0; i < pointsPx.length - 1; i++) {
+    const p0 = pointsPx[i - 1] ?? pointsPx[i];
+    const p1 = pointsPx[i];
+    const p2 = pointsPx[i + 1];
+    const p3 = pointsPx[i + 2] ?? p2;
+
+    const c1 = {
+      x: p1.x + (p2.x - p0.x) * (t / 6),
+      y: p1.y + (p2.y - p0.y) * (t / 6),
+    };
+    const c2 = {
+      x: p2.x - (p3.x - p1.x) * (t / 6),
+      y: p2.y - (p3.y - p1.y) * (t / 6),
+    };
+
+    d += ` C ${c1.x} ${c1.y}, ${c2.x} ${c2.y}, ${p2.x} ${p2.y}`;
+  }
+
+  return d;
+}
+
+function updateCurveOnly() {
+  const pointsPx = pts.map(toPx);
+  if (pointsPx.length >= 2) {
+    const d = catmullRomPathD(pointsPx, Number(tensionSlider.value));
+    svgPath.setAttribute("d", d);
+    svgPath.style.display = "";
+  } else {
+    svgPath.setAttribute("d", "");
+    svgPath.style.display = "none";
+  }
+}
+
+function updateJSONOnly() {
+  out.value = JSON.stringify(
+    pts.map(p => [Number(p.x.toFixed(2)), Number(p.y.toFixed(2))]),
+    null,
+    2
+  );
+}
+
+function fullRender() {
+  updateCurveOnly();
+
+  // remove old dots
+  document.querySelectorAll(".pt").forEach(el => el.remove());
+
+  // create dots fresh
+  pts.forEach((p, i) => {
+    const dot = document.createElement("div");
+    dot.className = "pt";
+    dot.dataset.index = String(i);
+
+    const label = document.createElement("div");
+    label.className = "label";
+    label.textContent = `${i + 1}: (${p.x.toFixed(1)}, ${p.y.toFixed(1)})`;
+    dot.appendChild(label);
+
+    positionDot(dot, p);
+
+    // Drag + click-to-delete behavior
+    attachDragHandlers(dot, i);
+
+    field.appendChild(dot);
+  });
+
+  updateJSONOnly();
+}
+
+function positionDot(dotEl, p) {
+  dotEl.style.left = (p.x * PX_PER_IN) + "px";
+  dotEl.style.top  = ((FIELD_H_IN - p.y) * PX_PER_IN) + "px";
+
+  // update label text too (dotEl first child is label)
+  const label = dotEl.querySelector(".label");
+  if (label) {
+    const idx = Number(dotEl.dataset.index) + 1;
+    label.textContent = `${idx}: (${p.x.toFixed(1)}, ${p.y.toFixed(1)})`;
+  }
+}
+
+function attachDragHandlers(dot, iAtCreation) {
+  let pointerId = null;
+  let startClient = null;
+  let startPoint = null;
+  let moved = false;
+
+  dot.addEventListener("pointerdown", (e) => {
+    e.stopPropagation(); // prevent field click (add/delete by radius)
+    pointerId = e.pointerId;
+    dot.setPointerCapture(pointerId);
+
+    startClient = { x: e.clientX, y: e.clientY };
+    startPoint = { ...pts[iAtCreation] };
+    moved = false;
+  });
+
+  dot.addEventListener("pointermove", (e) => {
+    if (pointerId === null || e.pointerId !== pointerId) return;
+
+    const dx = e.clientX - startClient.x;
+    const dy = e.clientY - startClient.y;
+
+    if (!moved && Math.hypot(dx, dy) >= DRAG_THRESHOLD_PX) {
+      moved = true;
+    }
+    if (!moved) return;
+
+    const p = getFieldInchesFromEvent(e);
+    pts[iAtCreation].x = p.x;
+    pts[iAtCreation].y = p.y;
+
+    // Update dot position + curve + JSON live (no full rebuild)
+    positionDot(dot, pts[iAtCreation]);
+    updateCurveOnly();
+    updateJSONOnly();
+  });
+
+  dot.addEventListener("pointerup", (e) => {
+    if (pointerId === null || e.pointerId !== pointerId) return;
+
+    dot.releasePointerCapture(pointerId);
+    pointerId = null;
+
+    // If it didn't move, treat as a click -> delete
+    if (!moved) {
+      pts.splice(iAtCreation, 1);
+      fullRender();
+    } else {
+      // After drag, indexes might still be fine but labels/indexes should refresh cleanly
+      fullRender();
+    }
+  });
+
+  dot.addEventListener("pointercancel", () => {
+    pointerId = null;
+    fullRender();
+  });
+}
+
+// Field click: add point OR delete if clicked near one (your original behavior)
+field.addEventListener("click", (e) => {
+  const p = getFieldInchesFromEvent(e);
+  const x = p.x, y = p.y;
+
+  // deletion by radius
   for (let i = 0; i < pts.length; i++) {
     const dx = pts[i].x - x;
     const dy = pts[i].y - y;
     const dist = Math.sqrt(dx * dx + dy * dy);
     if (dist < DELETE_RADIUS_IN) {
       pts.splice(i, 1);
-      render();
+      fullRender();
       return;
     }
   }
 
-  // Add new point
+  // add
   pts.push({ x, y });
-  render();
+  fullRender();
 });
 
 document.getElementById("undo").onclick = () => {
   pts.pop();
-  render();
+  fullRender();
 };
 
 document.getElementById("clear").onclick = () => {
   pts.length = 0;
-  render();
+  fullRender();
 };
 
 document.getElementById("copy").onclick = async () => {
@@ -212,7 +339,13 @@ document.getElementById("copy").onclick = async () => {
   alert("Copied waypoints JSON!");
 };
 
-render();
+tensionSlider.addEventListener("input", () => {
+  tensionVal.textContent = Number(tensionSlider.value).toFixed(2);
+  updateCurveOnly(); // only need to redraw curve
+});
+
+tensionVal.textContent = Number(tensionSlider.value).toFixed(2);
+fullRender();
 </script>
 
 </body>
