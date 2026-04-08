@@ -227,6 +227,28 @@
     overflow: hidden;
   }
 
+  .cameraCoords {
+    margin-top: 14px;
+    padding: 12px 14px;
+    border: 1px solid rgba(0,0,0,0.12);
+    border-radius: 12px;
+    background: rgba(255,255,255,0.7);
+  }
+
+  .cameraCoordsTitle {
+    font-size: 15px;
+    font-weight: 700;
+    margin-bottom: 8px;
+  }
+
+  .cameraCoordsRow {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 14px;
+    padding: 4px 0;
+  }
+
   .cameraHint {
     margin-top: 12px;
     font-size: 13px;
@@ -332,6 +354,13 @@
       Camera feed will go here
     </div>
 
+    <div class="cameraCoords">
+      <div class="cameraCoordsTitle">Robot Coordinates</div>
+      <div class="cameraCoordsRow"><span>X:</span> <span id="robotX">0.00</span></div>
+      <div class="cameraCoordsRow"><span>Y:</span> <span id="robotY">0.00</span></div>
+      <div class="cameraCoordsRow"><span>Heading:</span> <span id="robotHeading">0.00°</span></div>
+    </div>
+
     <div class="cameraHint">
       This space is reserved for your live robot camera, webcam feed, or vision output.
     </div>
@@ -375,6 +404,10 @@ const modeLabel = document.getElementById("modeLabel");
 const modeHint = document.getElementById("modeHint");
 const cursorLabel = document.getElementById("cursorLabel");
 
+const robotX = document.getElementById("robotX");
+const robotY = document.getElementById("robotY");
+const robotHeading = document.getElementById("robotHeading");
+
 let controlMode = "auton";
 
 const modeData = {
@@ -386,6 +419,12 @@ const modeData = {
     pts: [],
     selectedIndex: -1
   }
+};
+
+let robotPose = {
+  x: 0,
+  y: 0,
+  heading: 0
 };
 
 function getModeState() {
@@ -462,6 +501,15 @@ function setControlMode(mode) {
 
 autonBtn.addEventListener("click", () => setControlMode("auton"));
 teleopBtn.addEventListener("click", () => setControlMode("teleop"));
+
+/* =======================
+   Robot coordinate display
+======================= */
+function updateRobotCoords() {
+  robotX.textContent = robotPose.x.toFixed(2);
+  robotY.textContent = robotPose.y.toFixed(2);
+  robotHeading.textContent = robotPose.heading.toFixed(2) + "°";
+}
 
 /* =======================
    Catmull-Rom -> cubic Bezier
@@ -685,6 +733,13 @@ function fullRender() {
   updateCurveOnly();
   updateArrows();
   updateLength();
+
+  if (pts.length > 0) {
+    robotPose.x = pts[0].x;
+    robotPose.y = pts[0].y;
+  }
+
+  updateRobotCoords();
 
   document.querySelectorAll(".pt[data-idx]").forEach(el => el.remove());
 
