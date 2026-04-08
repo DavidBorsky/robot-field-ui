@@ -397,9 +397,6 @@
 </div>
 
 <script>
-/* =======================
-   Constants / state
-======================= */
 const FIELD_W_IN = 96;
 const FIELD_H_IN = 60;
 const PX_PER_IN = 10;
@@ -477,9 +474,6 @@ let hoverIn = null;
 let viewMode = false;
 let curveDrag = null;
 
-/* =======================
-   Helpers
-======================= */
 function clamp(v, lo, hi) {
   return Math.max(lo, Math.min(hi, v));
 }
@@ -515,9 +509,6 @@ function distPx(a, b) {
   return Math.hypot(a.x - b.x, a.y - b.y);
 }
 
-/* =======================
-   Mode switching
-======================= */
 function setControlMode(mode) {
   controlMode = mode;
 
@@ -532,18 +523,12 @@ function setControlMode(mode) {
 autonBtn.addEventListener("click", () => setControlMode("auton"));
 teleopBtn.addEventListener("click", () => setControlMode("teleop"));
 
-/* =======================
-   Robot coordinate display
-======================= */
 function updateRobotCoords() {
   robotX.textContent = robotPose.x.toFixed(2);
   robotY.textContent = robotPose.y.toFixed(2);
   robotHeading.textContent = robotPose.heading.toFixed(2) + "°";
 }
 
-/* =======================
-   Run button
-======================= */
 runBtn.addEventListener("click", () => {
   const pts = getPts();
 
@@ -557,9 +542,6 @@ runBtn.addEventListener("click", () => {
   alert(`Run started for ${controlMode} with ${pts.length} waypoint(s).`);
 });
 
-/* =======================
-   Catmull-Rom -> cubic Bezier
-======================= */
 function catmullRomPathD(pointsPx, tension = 0.85) {
   if (pointsPx.length === 0) return "";
   if (pointsPx.length === 1) return `M ${pointsPx[0].x} ${pointsPx[0].y}`;
@@ -625,16 +607,10 @@ function sampleSpline(pointsIn, samplesPerSeg = SAMPLES_PER_SEG) {
   return outS;
 }
 
-/* =======================
-   Temporary safe stub
-======================= */
 function insertPointNearCurve() {
   return null;
 }
 
-/* =======================
-   SVG layers
-======================= */
 const defs = document.createElementNS("http://www.w3.org/2000/svg", "defs");
 defs.innerHTML = `
   <marker id="arrowHead" markerWidth="10" markerHeight="8" refX="9" refY="4" orient="auto">
@@ -676,9 +652,6 @@ hoverLabel.style.opacity = "1";
 hoverDot.appendChild(hoverLabel);
 field.appendChild(hoverDot);
 
-/* =======================
-   Rendering
-======================= */
 function setModeUI() {
   modeLabel.textContent = viewMode ? `View | ${controlMode}` : `Edit | ${controlMode}`;
   modeHint.textContent = viewMode ? " (press Enter or click field to continue)" : " (press Enter to lock/view)";
@@ -811,9 +784,6 @@ function fullRender() {
   updateJSONOnly();
 }
 
-/* =======================
-   Dot interactions
-======================= */
 function attachDotHandlers(dot, iAtCreation) {
   let pointerId = null;
   let startClient = null;
@@ -889,9 +859,6 @@ function attachDotHandlers(dot, iAtCreation) {
   });
 }
 
-/* =======================
-   Field interactions
-======================= */
 function setCursorLabel(p) {
   if (!p) {
     cursorLabel.textContent = "(—, —)";
@@ -974,9 +941,6 @@ field.addEventListener("click", (e) => {
   fullRender();
 });
 
-/* =======================
-   Enter toggles View Mode
-======================= */
 document.addEventListener("keydown", (e) => {
   if (e.key !== "Enter") return;
 
@@ -990,9 +954,6 @@ document.addEventListener("keydown", (e) => {
   fullRender();
 });
 
-/* =======================
-   Buttons + typed point
-======================= */
 document.getElementById("undo").onclick = () => {
   const pts = getPts();
 
@@ -1171,9 +1132,6 @@ showGrid.addEventListener("change", () => {
   grid.style.display = showGrid.checked ? "" : "none";
 });
 
-/* =======================
-   Init
-======================= */
 tensionVal.textContent = Number(tensionSlider.value).toFixed(2);
 grid.style.display = showGrid.checked ? "" : "none";
 autonBtn.classList.toggle("active", controlMode === "auton");
