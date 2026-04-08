@@ -3,10 +3,51 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Robot Field (96" x 60")</title>
+<title>Robot Field</title>
 
 <style>
   body { font-family: system-ui, Arial, sans-serif; margin: 20px; }
+
+  #wrap { width: 960px; }
+
+  .topBar {
+    width: 960px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+  }
+
+  .topBar h2 {
+    margin: 0;
+  }
+
+  .modeToggle {
+    display: inline-flex;
+    border: 1px solid rgba(0,0,0,0.2);
+    border-radius: 999px;
+    overflow: hidden;
+    background: rgba(0,0,0,0.06);
+  }
+
+  .modeBtn {
+    border: none;
+    background: transparent;
+    padding: 8px 16px;
+    font-size: 14px;
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s;
+    margin: 0;
+  }
+
+  .modeBtn:hover {
+    background: rgba(0,0,0,0.08);
+  }
+
+  .modeBtn.active {
+    background: black;
+    color: white;
+  }
 
   #field {
     width: 960px;
@@ -14,11 +55,28 @@
     border: 3px solid #111;
     position: relative;
     user-select: none;
-
-    background-image: url("carpet.png");
+    background-image: url("./carpet.png");
     background-size: 960px 600px;
     background-repeat: no-repeat;
     background-position: center;
+    overflow: hidden;
+    outline: none;
+  }
+
+  #grid {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    opacity: 0.18;
+    background-image:
+      linear-gradient(to right, rgba(0,0,0,0.3) 1px, transparent 1px),
+      linear-gradient(to bottom, rgba(0,0,0,0.3) 1px, transparent 1px),
+      linear-gradient(to right, rgba(0,0,0,0.15) 1px, transparent 1px),
+      linear-gradient(to bottom, rgba(0,0,0,0.15) 1px, transparent 1px);
+    background-size:
+      100px 100px, 100px 100px,
+      20px 20px, 20px 20px;
+    z-index: 0;
   }
 
   #lines {
@@ -38,21 +96,24 @@
     transform: translate(-10px, -10px);
     z-index: 2;
     cursor: grab;
-    touch-action: none; /* important for dragging on mobile */
+    touch-action: none;
+    box-shadow: 0 0 0 0 rgba(0,0,0,0);
   }
 
   .pt:active { cursor: grabbing; }
+  .pt.start { background: rgb(30, 200, 60); }
+  .pt.end   { background: rgb(230, 50, 50); }
+  .pt.selected { box-shadow: 0 0 0 3px rgba(0,0,0,0.65); }
 
   .label {
     position: absolute;
     transform: translate(12px, -12px);
     font-size: 12px;
-    background: rgba(255,255,255,0.9);
+    background: rgba(255,255,255,0.92);
     padding: 3px 6px;
     border: 1px solid #ccc;
     border-radius: 4px;
     white-space: nowrap;
-
     opacity: 0;
     transition: opacity 0.15s;
     pointer-events: none;
@@ -60,81 +121,243 @@
 
   .pt:hover .label { opacity: 1; }
 
-  textarea { width: 960px; height: 150px; margin-top: 10px; }
-  button { margin-right: 8px; }
+  textarea {
+    width: 960px;
+    height: 150px;
+    margin-top: 10px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 12px;
+  }
+
+  button { margin-right: 8px; margin-top: 8px; }
 
   .hint { color: #444; margin: 8px 0 12px; }
 
   .row {
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
-    gap: 10px;
+    gap: 12px;
     margin-top: 10px;
   }
+
   .row label { font-size: 14px; color: #222; }
-  .row input[type="range"] { width: 260px; }
+  .row input[type="range"] { width: 240px; }
+
+  .pill {
+    display: inline-block;
+    padding: 4px 10px;
+    border-radius: 999px;
+    background: rgba(0,0,0,0.06);
+    border: 1px solid rgba(0,0,0,0.12);
+    font-size: 13px;
+  }
+
+  .inline {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .small { font-size: 12px; color: #333; opacity: 0.9; }
+
+  .statusBar {
+    margin-top: 10px;
+    width: 960px;
+    display: flex;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 8px 10px;
+    border: 1px solid rgba(0,0,0,0.15);
+    border-radius: 10px;
+    background: rgba(0,0,0,0.03);
+    font-size: 13px;
+  }
+
+  .coordInputs input {
+    width: 90px;
+    padding: 6px 8px;
+    border: 1px solid rgba(0,0,0,0.2);
+    border-radius: 8px;
+    font-size: 13px;
+  }
 </style>
 </head>
 
 <body>
 
-<h2>Robot Field (96" x 60")</h2>
+<div class="topBar">
+  <h2>Robot Field (96" x 60")</h2>
 
-<div class="hint">
-Click to add a waypoint. Click near a dot to delete it.
-Drag a dot to move it. Coordinates are in <b>inches</b>. (0,0) is bottom-left.
+  <div class="modeToggle" id="controlModeToggle" aria-label="Control mode toggle">
+    <button id="autonBtn" class="modeBtn active" type="button">Auton</button>
+    <button id="teleopBtn" class="modeBtn" type="button">Teleop</button>
+  </div>
 </div>
 
-<div id="field">
-  <svg id="lines" width="960" height="600"></svg>
+<div class="hint" id="hint">
+  <b>Controls:</b>
+  Drag a dot to move it. <b>Shift + click a dot</b> to delete.
+  <b>Shift + drag the curve</b> to “grab” and reshape it.
+  Press <b>Enter</b> to toggle View Mode (locks everything). In View Mode, click the field to continue editing.
+  Coordinates are in <b>inches</b>. (0,0) is bottom-left.
 </div>
 
-<div class="row">
-  <label for="tension">Curve tightness</label>
-  <input id="tension" type="range" min="0.2" max="1.2" step="0.05" value="0.85" />
-  <span id="tensionVal">0.85</span>
-</div>
+<div id="wrap">
+  <div id="field" tabindex="0" aria-label="Robot field editor">
+    <div id="grid"></div>
+    <svg id="lines" width="960" height="600"></svg>
+  </div>
 
-<div style="margin-top:10px;">
-  <button id="undo">Undo</button>
-  <button id="clear">Clear</button>
-  <button id="copy">Copy JSON</button>
-</div>
+  <div class="row">
+    <div class="inline">
+      <label for="tension">Curve tightness</label>
+      <input id="tension" type="range" min="0.2" max="1.2" step="0.05" value="0.85" />
+      <span id="tensionVal" class="pill">0.85</span>
+    </div>
 
-<textarea id="out" readonly></textarea>
+    <div class="inline">
+      <label class="inline">
+        <input id="snapOn" type="checkbox" />
+        Snap
+      </label>
+      <select id="snapStep">
+        <option value="0.1">0.1"</option>
+        <option value="0.25">0.25"</option>
+        <option value="0.5" selected>0.5"</option>
+        <option value="1">1"</option>
+        <option value="2">2"</option>
+      </select>
+    </div>
+
+    <div class="pill">Path length: <b><span id="pathLen">0.0</span>"</b></div>
+
+    <div class="inline">
+      <label class="inline">
+        <input id="showArrows" type="checkbox" checked />
+        Heading arrows
+      </label>
+      <label class="inline small">
+        <input id="showGrid" type="checkbox" checked />
+        Grid
+      </label>
+    </div>
+  </div>
+
+  <div class="row coordInputs">
+    <span class="pill">Add point:</span>
+    <label class="inline">X <input id="xIn" type="number" step="0.1" min="0" max="96" placeholder="0–96"></label>
+    <label class="inline">Y <input id="yIn" type="number" step="0.1" min="0" max="60" placeholder="0–60"></label>
+    <button id="addTyped">Add</button>
+  </div>
+
+  <div class="row">
+    <button id="undo">Undo</button>
+    <button id="clear">Clear</button>
+    <button id="reverse">Reverse Path</button>
+    <button id="copyWp">Copy Waypoints JSON</button>
+    <button id="copySamples">Copy Sampled Path JSON</button>
+    <button id="save">Save</button>
+    <button id="load">Load</button>
+    <button id="import">Import JSON</button>
+  </div>
+
+  <textarea id="out" readonly></textarea>
+
+  <div class="statusBar">
+    <div><b>Mode:</b> <span id="modeLabel">Edit | auton</span> <span id="modeHint" class="small"></span></div>
+    <div><b>Cursor:</b> <span id="cursorLabel">(—, —)</span></div>
+  </div>
+</div>
 
 <script>
+/* =======================
+   Constants / state
+======================= */
 const FIELD_W_IN = 96;
 const FIELD_H_IN = 60;
 const PX_PER_IN = 10;
-const DELETE_RADIUS_IN = 2;
 
-// Drag behavior
-const DRAG_THRESHOLD_PX = 4; // movement before we treat it as drag (not click)
+const DRAG_THRESHOLD_PX = 5;
+const SAMPLES_PER_SEG = 30;
+const ARROW_EVERY_N = 18;
+const ARROW_LEN_PX = 14;
 
 const field = document.getElementById("field");
-const lines = document.getElementById("lines");
+const grid = document.getElementById("grid");
+const svg = document.getElementById("lines");
 const out = document.getElementById("out");
+
+const autonBtn = document.getElementById("autonBtn");
+const teleopBtn = document.getElementById("teleopBtn");
 
 const tensionSlider = document.getElementById("tension");
 const tensionVal = document.getElementById("tensionVal");
+const snapOn = document.getElementById("snapOn");
+const snapStep = document.getElementById("snapStep");
+const pathLenEl = document.getElementById("pathLen");
+const showArrows = document.getElementById("showArrows");
+const showGrid = document.getElementById("showGrid");
 
-const pts = [];
+const xIn = document.getElementById("xIn");
+const yIn = document.getElementById("yIn");
+const addTypedBtn = document.getElementById("addTyped");
 
-// A single SVG path element for the curve (easier to update during drag)
-const svgPath = document.createElementNS("http://www.w3.org/2000/svg", "path");
-svgPath.setAttribute("fill", "none");
-svgPath.setAttribute("stroke", "black");
-svgPath.setAttribute("stroke-width", "4");
-svgPath.setAttribute("stroke-linecap", "round");
-svgPath.setAttribute("stroke-linejoin", "round");
-lines.appendChild(svgPath);
+const modeLabel = document.getElementById("modeLabel");
+const modeHint = document.getElementById("modeHint");
+const cursorLabel = document.getElementById("cursorLabel");
 
+let controlMode = "auton";
+
+const modeData = {
+  auton: {
+    pts: [],
+    selectedIndex: -1
+  },
+  teleop: {
+    pts: [],
+    selectedIndex: -1
+  }
+};
+
+function getModeState() {
+  return modeData[controlMode];
+}
+
+function getPts() {
+  return getModeState().pts;
+}
+
+function getSelectedIndex() {
+  return getModeState().selectedIndex;
+}
+
+function setSelectedIndex(v) {
+  getModeState().selectedIndex = v;
+}
+
+let hoverIn = null;
+let viewMode = false;
+let curveDrag = null;
+
+/* =======================
+   Helpers
+======================= */
 function clamp(v, lo, hi) {
   return Math.max(lo, Math.min(hi, v));
 }
 
-function getFieldInchesFromEvent(e) {
+function applySnap(valueIn) {
+  if (!snapOn.checked) return valueIn;
+  const step = Number(snapStep.value);
+  return Math.round(valueIn / step) * step;
+}
+
+function snapPoint(p) {
+  return { x: applySnap(p.x), y: applySnap(p.y) };
+}
+
+function inchesFromEvent(e) {
   const rect = field.getBoundingClientRect();
   const sx = e.clientX - rect.left;
   const sy = e.clientY - rect.top;
@@ -144,17 +367,37 @@ function getFieldInchesFromEvent(e) {
 
   x = clamp(x, 0, FIELD_W_IN);
   y = clamp(y, 0, FIELD_H_IN);
-  return { x, y };
+  return snapPoint({ x, y });
 }
 
-// inches -> px (with Y flip)
 function toPx(pIn) {
-  return {
-    x: pIn.x * PX_PER_IN,
-    y: (FIELD_H_IN - pIn.y) * PX_PER_IN
-  };
+  return { x: pIn.x * PX_PER_IN, y: (FIELD_H_IN - pIn.y) * PX_PER_IN };
 }
 
+function distPx(a, b) {
+  return Math.hypot(a.x - b.x, a.y - b.y);
+}
+
+/* =======================
+   Mode switching
+======================= */
+function setControlMode(mode) {
+  controlMode = mode;
+
+  autonBtn.classList.toggle("active", mode === "auton");
+  teleopBtn.classList.toggle("active", mode === "teleop");
+
+  hoverIn = null;
+  hoverDot.style.display = "none";
+  fullRender();
+}
+
+autonBtn.addEventListener("click", () => setControlMode("auton"));
+teleopBtn.addEventListener("click", () => setControlMode("teleop"));
+
+/* =======================
+   Catmull-Rom -> cubic Bezier
+======================= */
 function catmullRomPathD(pointsPx, tension = 0.85) {
   if (pointsPx.length === 0) return "";
   if (pointsPx.length === 1) return `M ${pointsPx[0].x} ${pointsPx[0].y}`;
@@ -183,19 +426,178 @@ function catmullRomPathD(pointsPx, tension = 0.85) {
   return d;
 }
 
+function sampleSpline(pointsIn, samplesPerSeg = SAMPLES_PER_SEG) {
+  if (pointsIn.length < 2) return [];
+  const P = pointsIn.map(toPx);
+  const t = Number(tensionSlider.value);
+
+  const outS = [];
+  for (let i = 0; i < P.length - 1; i++) {
+    const p0 = P[i - 1] ?? P[i];
+    const p1 = P[i];
+    const p2 = P[i + 1];
+    const p3 = P[i + 2] ?? p2;
+
+    const c1 = {
+      x: p1.x + (p2.x - p0.x) * (t / 6),
+      y: p1.y + (p2.y - p0.y) * (t / 6),
+    };
+    const c2 = {
+      x: p2.x - (p3.x - p1.x) * (t / 6),
+      y: p2.y - (p3.y - p1.y) * (t / 6),
+    };
+
+    for (let s = 0; s <= samplesPerSeg; s++) {
+      const u = s / samplesPerSeg;
+      const a = 1 - u;
+      const a2 = a * a, a3 = a2 * a;
+      const u2 = u * u, u3 = u2 * u;
+
+      const x = a3 * p1.x + 3 * a2 * u * c1.x + 3 * a * u2 * c2.x + u3 * p2.x;
+      const y = a3 * p1.y + 3 * a2 * u * c1.y + 3 * a * u2 * c2.y + u3 * p2.y;
+
+      const inPt = { x: x / PX_PER_IN, y: FIELD_H_IN - (y / PX_PER_IN) };
+      outS.push({ px: { x, y }, in: inPt, segIndex: i });
+    }
+  }
+  return outS;
+}
+
+/* =======================
+   Temporary safe stub
+======================= */
+function insertPointNearCurve() {
+  return null;
+}
+
+/* =======================
+   SVG layers
+======================= */
+const defs = document.createElementNS("http://www.w3.org/2000/svg", "defs");
+defs.innerHTML = `
+  <marker id="arrowHead" markerWidth="10" markerHeight="8" refX="9" refY="4" orient="auto">
+    <path d="M0,0 L10,4 L0,8 Z" fill="black"></path>
+  </marker>
+`;
+svg.appendChild(defs);
+
+const curvePath = document.createElementNS("http://www.w3.org/2000/svg", "path");
+curvePath.setAttribute("fill", "none");
+curvePath.setAttribute("stroke", "black");
+curvePath.setAttribute("stroke-width", "4");
+curvePath.setAttribute("stroke-linecap", "round");
+curvePath.setAttribute("stroke-linejoin", "round");
+svg.appendChild(curvePath);
+
+const previewPath = document.createElementNS("http://www.w3.org/2000/svg", "path");
+previewPath.setAttribute("fill", "none");
+previewPath.setAttribute("stroke", "black");
+previewPath.setAttribute("stroke-width", "3");
+previewPath.setAttribute("stroke-dasharray", "8 8");
+previewPath.setAttribute("stroke-linecap", "round");
+previewPath.setAttribute("stroke-linejoin", "round");
+previewPath.setAttribute("opacity", "0.45");
+svg.appendChild(previewPath);
+
+const arrowsGroup = document.createElementNS("http://www.w3.org/2000/svg", "g");
+svg.appendChild(arrowsGroup);
+
+const hoverDot = document.createElement("div");
+hoverDot.className = "pt";
+hoverDot.style.opacity = "0.35";
+hoverDot.style.pointerEvents = "none";
+hoverDot.style.display = "";
+
+const hoverLabel = document.createElement("div");
+hoverLabel.className = "label";
+hoverLabel.style.opacity = "1";
+hoverDot.appendChild(hoverLabel);
+field.appendChild(hoverDot);
+
+/* =======================
+   Rendering
+======================= */
+function setModeUI() {
+  modeLabel.textContent = viewMode ? `View | ${controlMode}` : `Edit | ${controlMode}`;
+  modeHint.textContent = viewMode ? " (press Enter or click field to continue)" : " (press Enter to lock/view)";
+}
+
 function updateCurveOnly() {
+  const pts = getPts();
   const pointsPx = pts.map(toPx);
+
   if (pointsPx.length >= 2) {
-    const d = catmullRomPathD(pointsPx, Number(tensionSlider.value));
-    svgPath.setAttribute("d", d);
-    svgPath.style.display = "";
+    curvePath.setAttribute("d", catmullRomPathD(pointsPx, Number(tensionSlider.value)));
+    curvePath.style.display = "";
   } else {
-    svgPath.setAttribute("d", "");
-    svgPath.style.display = "none";
+    curvePath.setAttribute("d", "");
+    curvePath.style.display = "none";
+  }
+
+  if (!viewMode && hoverIn && pts.length >= 1) {
+    const previewPts = [...pts, hoverIn].map(toPx);
+    previewPath.setAttribute("d", catmullRomPathD(previewPts, Number(tensionSlider.value)));
+    previewPath.style.display = "";
+  } else {
+    previewPath.setAttribute("d", "");
+    previewPath.style.display = "none";
   }
 }
 
+function updateArrows() {
+  const pts = getPts();
+
+  arrowsGroup.innerHTML = "";
+  if (!showArrows.checked) return;
+  if (pts.length < 2) return;
+
+  const samples = sampleSpline(pts, SAMPLES_PER_SEG);
+  for (let i = 0; i + 1 < samples.length; i += ARROW_EVERY_N) {
+    const a = samples[i].px;
+    const b = samples[i + 1].px;
+
+    const vx = b.x - a.x;
+    const vy = b.y - a.y;
+    const mag = Math.hypot(vx, vy);
+    if (mag < 0.001) continue;
+
+    const ux = vx / mag;
+    const uy = vy / mag;
+
+    const x2 = a.x + ux * ARROW_LEN_PX;
+    const y2 = a.y + uy * ARROW_LEN_PX;
+
+    const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
+    line.setAttribute("x1", a.x);
+    line.setAttribute("y1", a.y);
+    line.setAttribute("x2", x2);
+    line.setAttribute("y2", y2);
+    line.setAttribute("stroke", "black");
+    line.setAttribute("stroke-width", "2");
+    line.setAttribute("marker-end", "url(#arrowHead)");
+    line.setAttribute("opacity", "0.85");
+    arrowsGroup.appendChild(line);
+  }
+}
+
+function updateLength() {
+  const pts = getPts();
+
+  if (pts.length < 2) {
+    pathLenEl.textContent = "0.0";
+    return;
+  }
+
+  const samples = sampleSpline(pts, SAMPLES_PER_SEG);
+  let lenPx = 0;
+  for (let i = 1; i < samples.length; i++) {
+    lenPx += distPx(samples[i - 1].px, samples[i].px);
+  }
+  pathLenEl.textContent = (lenPx / PX_PER_IN).toFixed(1);
+}
+
 function updateJSONOnly() {
+  const pts = getPts();
   out.value = JSON.stringify(
     pts.map(p => [Number(p.x.toFixed(2)), Number(p.y.toFixed(2))]),
     null,
@@ -203,17 +605,29 @@ function updateJSONOnly() {
   );
 }
 
+function positionDot(dotEl, p) {
+  dotEl.style.left = (p.x * PX_PER_IN) + "px";
+  dotEl.style.top = ((FIELD_H_IN - p.y) * PX_PER_IN) + "px";
+}
+
 function fullRender() {
+  const pts = getPts();
+
+  setModeUI();
   updateCurveOnly();
+  updateArrows();
+  updateLength();
 
-  // remove old dots
-  document.querySelectorAll(".pt").forEach(el => el.remove());
+  document.querySelectorAll(".pt[data-idx]").forEach(el => el.remove());
 
-  // create dots fresh
   pts.forEach((p, i) => {
     const dot = document.createElement("div");
     dot.className = "pt";
-    dot.dataset.index = String(i);
+    dot.dataset.idx = String(i);
+
+    if (i === 0) dot.classList.add("start");
+    if (i === pts.length - 1) dot.classList.add("end");
+    if (i === getSelectedIndex()) dot.classList.add("selected");
 
     const label = document.createElement("div");
     label.className = "label";
@@ -221,132 +635,384 @@ function fullRender() {
     dot.appendChild(label);
 
     positionDot(dot, p);
-
-    // Drag + click-to-delete behavior
-    attachDragHandlers(dot, i);
-
+    attachDotHandlers(dot, i);
     field.appendChild(dot);
   });
 
   updateJSONOnly();
 }
 
-function positionDot(dotEl, p) {
-  dotEl.style.left = (p.x * PX_PER_IN) + "px";
-  dotEl.style.top  = ((FIELD_H_IN - p.y) * PX_PER_IN) + "px";
-
-  // update label text too (dotEl first child is label)
-  const label = dotEl.querySelector(".label");
-  if (label) {
-    const idx = Number(dotEl.dataset.index) + 1;
-    label.textContent = `${idx}: (${p.x.toFixed(1)}, ${p.y.toFixed(1)})`;
-  }
-}
-
-function attachDragHandlers(dot, iAtCreation) {
+/* =======================
+   Dot interactions
+======================= */
+function attachDotHandlers(dot, iAtCreation) {
   let pointerId = null;
   let startClient = null;
-  let startPoint = null;
   let moved = false;
 
   dot.addEventListener("pointerdown", (e) => {
-    e.stopPropagation(); // prevent field click (add/delete by radius)
+    if (viewMode) return;
+
+    e.stopPropagation();
+    e.preventDefault();
+
     pointerId = e.pointerId;
     dot.setPointerCapture(pointerId);
-
     startClient = { x: e.clientX, y: e.clientY };
-    startPoint = { ...pts[iAtCreation] };
     moved = false;
   });
 
   dot.addEventListener("pointermove", (e) => {
+    const pts = getPts();
+
+    if (viewMode) return;
     if (pointerId === null || e.pointerId !== pointerId) return;
 
     const dx = e.clientX - startClient.x;
     const dy = e.clientY - startClient.y;
 
-    if (!moved && Math.hypot(dx, dy) >= DRAG_THRESHOLD_PX) {
-      moved = true;
-    }
+    if (!moved && Math.hypot(dx, dy) >= DRAG_THRESHOLD_PX) moved = true;
     if (!moved) return;
 
-    const p = getFieldInchesFromEvent(e);
-    pts[iAtCreation].x = p.x;
-    pts[iAtCreation].y = p.y;
+    const p = inchesFromEvent(e);
+    pts[iAtCreation] = p;
 
-    // Update dot position + curve + JSON live (no full rebuild)
-    positionDot(dot, pts[iAtCreation]);
+    positionDot(dot, p);
     updateCurveOnly();
+    updateArrows();
+    updateLength();
     updateJSONOnly();
   });
 
   dot.addEventListener("pointerup", (e) => {
+    const pts = getPts();
+
+    if (viewMode) return;
     if (pointerId === null || e.pointerId !== pointerId) return;
+
+    e.stopPropagation();
+    e.preventDefault();
 
     dot.releasePointerCapture(pointerId);
     pointerId = null;
 
-    // If it didn't move, treat as a click -> delete
     if (!moved) {
       pts.splice(iAtCreation, 1);
+
+      if (getSelectedIndex() === iAtCreation) setSelectedIndex(-1);
+      if (getSelectedIndex() > iAtCreation) setSelectedIndex(getSelectedIndex() - 1);
+
       fullRender();
-    } else {
-      // After drag, indexes might still be fine but labels/indexes should refresh cleanly
-      fullRender();
+      return;
     }
+
+    fullRender();
   });
 
   dot.addEventListener("pointercancel", () => {
     pointerId = null;
     fullRender();
   });
+
+  dot.addEventListener("click", (e) => {
+    e.stopPropagation();
+    e.preventDefault();
+  });
 }
 
-// Field click: add point OR delete if clicked near one (your original behavior)
-field.addEventListener("click", (e) => {
-  const p = getFieldInchesFromEvent(e);
-  const x = p.x, y = p.y;
-
-  // deletion by radius
-  for (let i = 0; i < pts.length; i++) {
-    const dx = pts[i].x - x;
-    const dy = pts[i].y - y;
-    const dist = Math.sqrt(dx * dx + dy * dy);
-    if (dist < DELETE_RADIUS_IN) {
-      pts.splice(i, 1);
-      fullRender();
-      return;
-    }
+/* =======================
+   Field interactions
+======================= */
+function setCursorLabel(p) {
+  if (!p) {
+    cursorLabel.textContent = "(—, —)";
+    return;
   }
+  cursorLabel.textContent = `(${p.x.toFixed(2)}, ${p.y.toFixed(2)})`;
+}
 
-  // add
-  pts.push({ x, y });
+field.addEventListener("mousemove", (e) => {
+  const p = inchesFromEvent(e);
+  setCursorLabel(p);
+
+  if (viewMode) return;
+
+  hoverIn = p;
+  hoverDot.style.display = "";
+  positionDot(hoverDot, hoverIn);
+  hoverLabel.textContent = `(${p.x.toFixed(1)}, ${p.y.toFixed(1)})`;
+  updateCurveOnly();
+});
+
+field.addEventListener("mouseleave", () => {
+  setCursorLabel(null);
+  hoverDot.style.display = "none";
+  updateCurveOnly();
+});
+
+field.addEventListener("pointerdown", (e) => {
+  field.focus();
+
+  if (viewMode) return;
+  if (!e.shiftKey) return;
+
+  const inserted = insertPointNearCurve(e);
+  if (!inserted) return;
+
+  const idx = inserted.idx;
+  curveDrag = { pointerId: e.pointerId, idx };
+
+  field.setPointerCapture(e.pointerId);
+});
+
+field.addEventListener("pointermove", (e) => {
+  const pts = getPts();
+
+  if (!curveDrag) return;
+  if (viewMode) return;
+  if (e.pointerId !== curveDrag.pointerId) return;
+
+  const p = inchesFromEvent(e);
+  pts[curveDrag.idx] = p;
   fullRender();
 });
 
+field.addEventListener("pointerup", (e) => {
+  if (!curveDrag) return;
+  if (e.pointerId !== curveDrag.pointerId) return;
+  curveDrag = null;
+});
+
+field.addEventListener("pointercancel", () => {
+  curveDrag = null;
+});
+
+field.addEventListener("click", (e) => {
+  const pts = getPts();
+
+  if (e.target.closest(".pt")) return;
+  if (viewMode) return;
+
+  if (e.shiftKey) {
+    const inserted = insertPointNearCurve(e);
+    if (inserted) return;
+    return;
+  }
+
+  const p = inchesFromEvent(e);
+  pts.push(p);
+  setSelectedIndex(pts.length - 1);
+  fullRender();
+});
+
+/* =======================
+   Enter toggles View Mode
+======================= */
+document.addEventListener("keydown", (e) => {
+  if (e.key !== "Enter") return;
+
+  const tag = (e.target && e.target.tagName) ? e.target.tagName.toLowerCase() : "";
+  if (tag === "input" || tag === "textarea" || tag === "select") return;
+
+  viewMode = !viewMode;
+  hoverIn = null;
+  hoverDot.style.display = "none";
+  curveDrag = null;
+  fullRender();
+});
+
+/* =======================
+   Buttons + typed point
+======================= */
 document.getElementById("undo").onclick = () => {
+  const pts = getPts();
+
+  if (viewMode) return;
   pts.pop();
+  if (getSelectedIndex() >= pts.length) setSelectedIndex(pts.length - 1);
   fullRender();
 };
 
 document.getElementById("clear").onclick = () => {
+  const pts = getPts();
+
+  if (viewMode) return;
   pts.length = 0;
+  setSelectedIndex(-1);
   fullRender();
 };
 
-document.getElementById("copy").onclick = async () => {
+document.getElementById("reverse").onclick = () => {
+  const pts = getPts();
+
+  if (viewMode) return;
+  pts.reverse();
+  if (getSelectedIndex() !== -1) {
+    setSelectedIndex(pts.length - 1 - getSelectedIndex());
+  }
+  fullRender();
+};
+
+document.getElementById("copyWp").onclick = async () => {
   await navigator.clipboard.writeText(out.value);
   alert("Copied waypoints JSON!");
 };
 
-tensionSlider.addEventListener("input", () => {
-  tensionVal.textContent = Number(tensionSlider.value).toFixed(2);
-  updateCurveOnly(); // only need to redraw curve
+function sampledPathJSON() {
+  const pts = getPts();
+  const samples = sampleSpline(pts, SAMPLES_PER_SEG);
+
+  const arr = samples.map(s => ([
+    Number(s.in.x.toFixed(2)),
+    Number(s.in.y.toFixed(2))
+  ]));
+
+  return JSON.stringify(arr, null, 2);
+}
+
+document.getElementById("copySamples").onclick = async () => {
+  await navigator.clipboard.writeText(sampledPathJSON());
+  alert("Copied sampled path JSON!");
+};
+
+document.getElementById("save").onclick = () => {
+  const pts = getPts();
+
+  const name = prompt("Save name?", `${controlMode}-path-1`);
+  if (!name) return;
+
+  const payload = {
+    controlMode,
+    pts: pts.map(p => [Number(p.x.toFixed(4)), Number(p.y.toFixed(4))]),
+    tension: Number(tensionSlider.value),
+    snap: { on: snapOn.checked, step: Number(snapStep.value) },
+    updatedAt: new Date().toISOString()
+  };
+
+  localStorage.setItem("robotFieldUI:" + name, JSON.stringify(payload));
+  alert(`Saved "${name}"`);
+};
+
+document.getElementById("load").onclick = () => {
+  const keys = Object.keys(localStorage).filter(k => k.startsWith("robotFieldUI:"));
+  if (keys.length === 0) {
+    alert("No saved paths yet.");
+    return;
+  }
+
+  const names = keys.map(k => k.replace("robotFieldUI:", ""));
+  const name = prompt("Load which?\n\n" + names.join("\n"), names[0]);
+  if (!name) return;
+
+  const raw = localStorage.getItem("robotFieldUI:" + name);
+  if (!raw) {
+    alert("Not found.");
+    return;
+  }
+
+  try {
+    const payload = JSON.parse(raw);
+
+    if (payload.controlMode === "teleop" || payload.controlMode === "auton") {
+      controlMode = payload.controlMode;
+    }
+
+    const pts = getPts();
+    pts.length = 0;
+    (payload.pts ?? []).forEach(a => pts.push({ x: Number(a[0]), y: Number(a[1]) }));
+
+    if (payload.tension != null) tensionSlider.value = String(payload.tension);
+    if (payload.snap) {
+      snapOn.checked = !!payload.snap.on;
+      snapStep.value = String(payload.snap.step ?? snapStep.value);
+    }
+
+    tensionVal.textContent = Number(tensionSlider.value).toFixed(2);
+    setSelectedIndex(pts.length ? pts.length - 1 : -1);
+
+    autonBtn.classList.toggle("active", controlMode === "auton");
+    teleopBtn.classList.toggle("active", controlMode === "teleop");
+
+    fullRender();
+    alert(`Loaded "${name}"`);
+  } catch {
+    alert("Failed to load: corrupted save.");
+  }
+};
+
+document.getElementById("import").onclick = () => {
+  const pts = getPts();
+
+  const raw = prompt('Paste waypoints JSON like:\n[[12,8],[30,8],[30,40]]');
+  if (!raw) return;
+
+  try {
+    const arr = JSON.parse(raw);
+    if (!Array.isArray(arr)) throw new Error("not array");
+
+    pts.length = 0;
+    for (const item of arr) {
+      if (!Array.isArray(item) || item.length < 2) continue;
+      const x = clamp(Number(item[0]), 0, FIELD_W_IN);
+      const y = clamp(Number(item[1]), 0, FIELD_H_IN);
+      pts.push(snapPoint({ x, y }));
+    }
+
+    setSelectedIndex(pts.length ? pts.length - 1 : -1);
+    fullRender();
+  } catch {
+    alert("Invalid JSON.");
+  }
+};
+
+addTypedBtn.onclick = () => {
+  const pts = getPts();
+
+  if (viewMode) return;
+  const x = clamp(Number(xIn.value), 0, FIELD_W_IN);
+  const y = clamp(Number(yIn.value), 0, FIELD_H_IN);
+
+  if (Number.isNaN(x) || Number.isNaN(y)) {
+    alert("Enter valid X and Y.");
+    return;
+  }
+
+  pts.push(snapPoint({ x, y }));
+  setSelectedIndex(pts.length - 1);
+  fullRender();
+};
+
+[xIn, yIn].forEach(inp => {
+  inp.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      addTypedBtn.click();
+    }
+  });
 });
 
+tensionSlider.addEventListener("input", () => {
+  tensionVal.textContent = Number(tensionSlider.value).toFixed(2);
+  fullRender();
+});
+
+showArrows.addEventListener("change", fullRender);
+
+showGrid.addEventListener("change", () => {
+  grid.style.display = showGrid.checked ? "" : "none";
+});
+
+/* =======================
+   Init
+======================= */
 tensionVal.textContent = Number(tensionSlider.value).toFixed(2);
+grid.style.display = showGrid.checked ? "" : "none";
+autonBtn.classList.toggle("active", controlMode === "auton");
+teleopBtn.classList.toggle("active", controlMode === "teleop");
+setModeUI();
 fullRender();
 </script>
 
 </body>
 </html>
+
