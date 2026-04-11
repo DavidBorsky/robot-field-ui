@@ -9,7 +9,7 @@ controllers such as Ramsete.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from math import sqrt
+from math import acos, sqrt
 from typing import Protocol
 
 from constants import DEFAULT_CONTROL_DT_S, MAX_DRIVE_OUTPUT
@@ -51,14 +51,17 @@ class PurePursuitFollower:
         min_speed: float = 0.1,
         max_speed: float = 1.0,
         goal_tolerance_in: float = 0.75,
+        speed_ramp_per_s: float = 1.8,
     ):
         self.lookahead_in = lookahead_in
         self.min_speed = min_speed
         self.max_speed = max_speed
         self.goal_tolerance_in = goal_tolerance_in
+        self.speed_ramp_per_s = speed_ramp_per_s
         self.drive_controller = DriveController()
         self.path: list[PathPoint] = []
         self.current_index = 0
+        self.last_speed_scale = min_speed
 
     def load_path(self, points: list[PathPoint]) -> None:
         self.path = points
@@ -66,6 +69,7 @@ class PurePursuitFollower:
 
     def reset(self) -> None:
         self.current_index = 0
+        self.last_speed_scale = self.min_speed
         self.drive_controller.reset()
 
     def is_finished(self, pose: Pose2D) -> bool:
@@ -178,14 +182,62 @@ class PurePursuitFollower:
 
         return self.path[-1], closest
 
-    def _compute_speed_scale(self, pose: Pose2D, target: PathPoint) -> float:
+    def _segment_turn_severity(self, closest: ClosestPathSample) -> float:
+        if len(self.path) < 3:
+            return 0.0
+
+        segment_index = min(max(closest.segment_index, 0), len(self.path) - 2)
+        if segment_index >= len(self.path) - 2:
+            return 0.0
+
+        first_start = self.path[segment_index]
+        first_end = self.path[segment_index + 1]
+        second_end = self.path[segment_index + 2]
+
+        ax = first_end.x - first_start.x
+        ay = first_end.y - first_start.y
+        bx = second_end.x - first_end.x
+        by = second_end.y - first_end.y
+
+        a_mag = sqrt(ax * ax + ay * ay)
+        b_mag = sqrt(bx * bx + by * by)
+        if a_mag <= 1e-9 or b_mag <= 1e-9:
+            return 0.0
+
+        dot = ax * bx + ay * by
+        cos_theta = clamp(dot / (a_mag * b_mag), -1.0, 1.0)
+        turn_angle = acos(cos_theta)
+        return clamp(turn_angle / 3.141592653589793, 0.0, 1.0)
+
+    def _compute_speed_scale(
+        self,
+        pose: Pose2D,
+        target: PathPoint,
+        closest: ClosestPathSample,
+        dt: float,
+    ) -> float:
         remaining = pose.distance_to(self.path[-1].x, self.path[-1].y)
         target_dist = pose.distance_to(target.x, target.y)
+        turn_severity = self._segment_turn_severity(closest)
 
-        # Slow near the end of the path, but keep a minimum crawl speed.
-        end_scale = clamp(remaining / 12.0, self.min_speed, self.max_speed)
+        # Slow near the end of the path, around sharper corners, and when the
+        # lookahead target is very close, but do not jump instantly between values.
+        end_scale = clamp(remaining / 14.0, self.min_speed, self.max_speed)
         target_scale = clamp(target_dist / max(self.lookahead_in, 1e-6), self.min_speed, 1.0)
-        return clamp(min(end_scale, target_scale), self.min_speed, self.max_speed)
+        corner_scale = clamp(self.max_speed - 0.55 * turn_severity, self.min_speed, self.max_speed)
+        requested_scale = clamp(
+            min(end_scale, target_scale, corner_scale),
+            self.min_speed,
+            self.max_speed,
+        )
+        max_delta = self.speed_ramp_per_s * max(dt, 1e-6)
+        smoothed_scale = clamp(
+            requested_scale,
+            self.last_speed_scale - max_delta,
+            self.last_speed_scale + max_delta,
+        )
+        self.last_speed_scale = smoothed_scale
+        return smoothed_scale
 
     def update(
         self,
@@ -196,7 +248,7 @@ class PurePursuitFollower:
             return MotorCommand(0.0, 0.0), {"finished": True, "reason": "empty path"}
 
         lookahead, closest = self._select_lookahead_point(pose)
-        speed_scale = self._compute_speed_scale(pose, lookahead)
+        speed_scale = self._compute_speed_scale(pose, lookahead, closest, dt)
 
         command, debug = self.drive_controller.command_to_waypoint(
             pose=pose,
@@ -220,6 +272,7 @@ class PurePursuitFollower:
                 "closest_y": closest.point.y,
                 "closest_distance": closest.distance,
                 "speed_scale": speed_scale,
+                "turn_severity": self._segment_turn_severity(closest),
                 "remaining_distance": pose.distance_to(goal.x, goal.y),
                 "current_index": self.current_index,
             }

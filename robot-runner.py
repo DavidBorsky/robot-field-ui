@@ -7,6 +7,13 @@ from pathlib import Path
 
 from camera import SimulatedCamera, VisionTarget, create_camera
 from connection import create_connection
+from constants import (
+    DEFAULT_CONTROL_DT_S,
+    DEFAULT_SERIAL_PORT_LINUX,
+    SIM_MAX_FORWARD_SPEED_IN_PER_S,
+    SIM_MAX_STEPS_PER_RUN,
+    SIM_MAX_STRAFE_SPEED_IN_PER_S,
+)
 from gyro import SimulatedGyro, create_gyro
 from ir_sensor import EdgeSafetyController, IRSensorState
 from odom import FrontBackMecanumOdometry
@@ -35,6 +42,24 @@ def load_robot_paths(path_file: Path = DEFAULT_PATH_FILE) -> dict:
 def get_waypoints(payload: dict, mode: str = "auton") -> list[Waypoint]:
     raw_points = payload.get("paths", {}).get(mode, [])
     return [Waypoint(float(x), float(y)) for x, y in raw_points]
+
+
+def apply_simulated_motion(
+    odom: FrontBackMecanumOdometry,
+    front_output: float,
+    back_output: float,
+    dt: float = DEFAULT_CONTROL_DT_S,
+) -> None:
+    front_distance_in = front_output * SIM_MAX_FORWARD_SPEED_IN_PER_S * dt
+    back_distance_in = back_output * SIM_MAX_FORWARD_SPEED_IN_PER_S * dt
+
+    # Add a small extra strafe response so the virtual robot exposes more of the
+    # front/back mecanum behavior during pre-hardware testing.
+    strafe_bias_in = (front_output - back_output) * SIM_MAX_STRAFE_SPEED_IN_PER_S * dt * 0.5
+    odom.update(
+        front_distance_in=front_distance_in + strafe_bias_in,
+        back_distance_in=back_distance_in - strafe_bias_in,
+    )
 
 
 def run_path(
@@ -82,26 +107,34 @@ def run_path(
 
     print("\nFollower preview:")
     try:
-        for step in range(1, min(len(waypoints) + 2, 6)):
+        last_command = None
+        for step in range(1, SIM_MAX_STEPS_PER_RUN + 1):
+            if simulate_connection and last_command is not None:
+                apply_simulated_motion(
+                    odom=odom,
+                    front_output=last_command.front_output,
+                    back_output=last_command.back_output,
+                )
+
             sensor_snapshot = connection.read_sensors()
             ir_state = sensor_snapshot.ir
 
             if simulate_connection and hasattr(connection, "set_sensor_snapshot"):
                 # Simulate an edge event once so the protection path can be tested.
-                simulated_ir = IRSensorState(left_edge_detected=(step == 3), right_edge_detected=False)
+                simulated_ir = IRSensorState(left_edge_detected=(step == 12), right_edge_detected=False)
                 connection.set_sensor_snapshot(connection.read_sensors().__class__(ir=simulated_ir, heading_deg=None))
                 sensor_snapshot = connection.read_sensors()
                 ir_state = sensor_snapshot.ir
                 if isinstance(gyro, SimulatedGyro):
-                    gyro.set_heading(heading_deg=(step - 1) * 4.0, angular_rate_dps=4.0)
+                    gyro.set_heading(heading_deg=odom.pose.heading_deg, angular_rate_dps=0.0)
                 if isinstance(camera, SimulatedCamera):
                     camera.set_target(
                         VisionTarget(
-                            visible=(step == 4),
-                            x_offset_norm=-0.18 if step == 4 else 0.0,
-                            y_offset_norm=0.06 if step == 4 else 0.0,
-                            confidence=0.85 if step == 4 else 0.0,
-                            label="alignment-target" if step == 4 else "",
+                            visible=(step == 18),
+                            x_offset_norm=-0.18 if step == 18 else 0.0,
+                            y_offset_norm=0.06 if step == 18 else 0.0,
+                            confidence=0.85 if step == 18 else 0.0,
+                            label="alignment-target" if step == 18 else "",
                         )
                     )
 
@@ -121,11 +154,13 @@ def run_path(
             command = edge_correction.command
             print(
                 f"- step {step}: "
+                f"x={odom.pose.x:.2f}, y={odom.pose.y:.2f}, "
                 f"front={command.front_output:.3f}, back={command.back_output:.3f}, "
                 f"heading={gyro_reading.heading_deg:.2f}, "
                 f"frame={frame.frame_id}, "
                 f"lookahead=({debug['lookahead_x']:.2f}, {debug['lookahead_y']:.2f}), "
                 f"speed={debug['speed_scale']:.2f}, "
+                f"turn={debug['turn_severity']:.2f}, "
                 f"remaining={debug['remaining_distance']:.2f}, "
                 f"edge_override={edge_correction.edge_override_active}"
             )
@@ -136,9 +171,14 @@ def run_path(
                     f"  vision: target={vision_target.label} "
                     f"x_offset={vision_target.x_offset_norm:.2f} "
                     f"y_offset={vision_target.y_offset_norm:.2f} "
-                    f"confidence={vision_target.confidence:.2f}"
+                            f"confidence={vision_target.confidence:.2f}"
                 )
             connection.send_motor_command(command)
+            last_command = command
+
+            if debug["finished"]:
+                print("  path complete: goal tolerance reached")
+                break
 
         print(
             "\nNext hardware step: replace the simulated IR/camera events with real "
@@ -167,7 +207,7 @@ if __name__ == "__main__":
     )
     parser.add_argument(
         "--port",
-        default="/dev/ttyACM0",
+        default=DEFAULT_SERIAL_PORT_LINUX,
         help="Serial port, for example COM3 or /dev/ttyACM0",
     )
     parser.add_argument("--baud", type=int, default=115200, help="Serial baud rate")

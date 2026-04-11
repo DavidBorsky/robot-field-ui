@@ -48,6 +48,8 @@ The browser UI plans paths, and `robot-paths.json` is the shared format that bot
 
 - `constants.py`
   PID gains, wheel diameter, track width, speed limits, camera offsets, and other tuning values.
+  It now also holds the current Pi/Uno model names, 12V battery assumption,
+  1:1 gear ratio, and simulated chassis response values for pre-hardware testing.
 
 - `connection.py`
   Pi-to-Arduino or laptop-to-Pi communications.
@@ -65,12 +67,21 @@ The browser UI plans paths, and `robot-paths.json` is the shared format that bot
 - Arduino
   Handles low-level motor and sensor I/O, then receives movement commands from the Pi.
 
+## Confirmed hardware
+
+- Raspberry Pi: Raspberry Pi 3 Model B v1.2 (2015)
+- Arduino: Arduino Uno
+- Drive battery: 12V
+
 ## Current chassis assumptions
 
 - 2 motors total
 - front motor drives both front wheels
 - back motor drives both back wheels
 - 4 mecanum wheels
+- motor model: Tsiny geared motor
+- motor nominal voltage: 12V DC
+- motor free speed: 300 RPM
 - wheel diameter: 2.0 in
 - wheel width: 1.0 in
 - outer front/back spacing: about 4.5 in
@@ -83,6 +94,9 @@ In software, this is currently modeled as a front/back two-channel drive:
 
 True rotational behavior may need to be refined after the real chassis is built and tested.
 
+Based on the current 2-inch wheel assumption, 300 RPM corresponds to a rough
+theoretical wheel-edge speed of about 31.4 in/s before real-world load losses.
+
 ## Data flow
 
 1. Build a path in the UI.
@@ -90,6 +104,10 @@ True rotational behavior may need to be refined after the real chassis is built 
 3. Put that payload into `robot-paths.json`.
 4. Run `robot-runner.py` on the Raspberry Pi.
 5. `robot-runner.py` loads the chosen path and uses PID, odometry, drivetrain, gyro, camera, and connection code to follow it.
+
+In simulated mode, `robot-runner.py` now also advances a virtual pose from the
+generated motor commands. That gives a much more useful pre-hardware test loop
+than repeatedly commanding the same stationary pose.
 
 ## Current Arduino protocol
 
