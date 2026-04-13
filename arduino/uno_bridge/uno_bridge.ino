@@ -6,6 +6,7 @@
   - Arduino Uno <-> L298N motor driver
   - two encoder-equipped motors
   - optional left/right IR edge sensors
+  - optional front/back temperature analog sense
   - optional battery-voltage analog sense
 
   Serial protocol from the Pi:
@@ -63,9 +64,13 @@ const float BACK_ENCODER_COUNTS_PER_REV = 360.0f;
 // Optional sensors. Leave as -1 if not wired yet.
 const int LEFT_IR_PIN = -1;
 const int RIGHT_IR_PIN = -1;
+const int FRONT_TEMP_SENSOR_PIN = -1;
+const int BACK_TEMP_SENSOR_PIN = -1;
 const int BATTERY_VOLTAGE_PIN = -1;
 const float BATTERY_VOLTAGE_DIVIDER_RATIO = 1.0f;
 const float ADC_REFERENCE_VOLTAGE = 5.0f;
+const float TEMP_SENSOR_VOLTS_PER_C = 0.01f;
+const float TEMP_SENSOR_OFFSET_C = 0.0f;
 
 const unsigned long SENSOR_REPORT_INTERVAL_MS = 50;
 const unsigned long COMMAND_WATCHDOG_TIMEOUT_MS = 250;
@@ -211,6 +216,16 @@ float readBatteryVoltage() {
   return sensedVoltage * BATTERY_VOLTAGE_DIVIDER_RATIO;
 }
 
+float readTemperatureC(int pin) {
+  if (pin < 0) {
+    return NAN;
+  }
+
+  const int raw = analogRead(pin);
+  const float sensedVoltage = (raw / 1023.0f) * ADC_REFERENCE_VOLTAGE;
+  return (sensedVoltage / TEMP_SENSOR_VOLTS_PER_C) + TEMP_SENSOR_OFFSET_C;
+}
+
 void printOptionalFloat(float value) {
   if (isnan(value)) {
     return;
@@ -221,6 +236,8 @@ void printOptionalFloat(float value) {
 void printSensorPacket() {
   computeRpm(frontEncoder, FRONT_ENCODER_COUNTS_PER_REV);
   computeRpm(backEncoder, BACK_ENCODER_COUNTS_PER_REV);
+  const float frontTempC = readTemperatureC(FRONT_TEMP_SENSOR_PIN);
+  const float backTempC = readTemperatureC(BACK_TEMP_SENSOR_PIN);
 
   Serial.print("S,");
   Serial.print(readEdgePin(LEFT_IR_PIN));
@@ -237,9 +254,9 @@ void printSensorPacket() {
   Serial.print(",");
   Serial.print(backEncoder.rpm, 3);
   Serial.print(",");
-  printOptionalFloat(NAN);
+  printOptionalFloat(frontTempC);
   Serial.print(",");
-  printOptionalFloat(NAN);
+  printOptionalFloat(backTempC);
   Serial.print(",");
   printOptionalFloat(readBatteryVoltage());
   Serial.println();
@@ -257,6 +274,8 @@ void setupMotorPins() {
 void setupSensorPins() {
   if (LEFT_IR_PIN >= 0) pinMode(LEFT_IR_PIN, INPUT_PULLUP);
   if (RIGHT_IR_PIN >= 0) pinMode(RIGHT_IR_PIN, INPUT_PULLUP);
+  if (FRONT_TEMP_SENSOR_PIN >= 0) pinMode(FRONT_TEMP_SENSOR_PIN, INPUT);
+  if (BACK_TEMP_SENSOR_PIN >= 0) pinMode(BACK_TEMP_SENSOR_PIN, INPUT);
   if (BATTERY_VOLTAGE_PIN >= 0) pinMode(BATTERY_VOLTAGE_PIN, INPUT);
 
   if (encoderPinsConfigured(FRONT_ENCODER_A_PIN, FRONT_ENCODER_B_PIN)) {

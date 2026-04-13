@@ -194,7 +194,23 @@ Optional inputs are still disabled by default until they are physically wired:
 
 - left IR edge sensor
 - right IR edge sensor
+- front motor temperature analog sense
+- back motor temperature analog sense
 - battery voltage analog sense
+
+The Uno bridge now has optional front/back motor temperature inputs as well.
+They are disabled by default with pin `-1`, but once a temperature sensor output
+is available you can point them at free analog pins in `uno_bridge.ino`:
+
+- `FRONT_TEMP_SENSOR_PIN`
+- `BACK_TEMP_SENSOR_PIN`
+
+The sketch currently assumes a simple analog temperature sensor model of
+`10 mV / C` with zero offset, which matches common sensors such as an LM35.
+If your temperature hardware uses a different conversion, adjust:
+
+- `TEMP_SENSOR_VOLTS_PER_C`
+- `TEMP_SENSOR_OFFSET_C`
 
 The Uno sketch now also includes a command watchdog, so if fresh motor commands
 stop arriving for about `250 ms`, it hard-stops both motor channels.
