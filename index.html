@@ -1009,6 +1009,18 @@ function setRobotMotorRpm(value) {
   robotMotorRpmEstimate = Math.max(0, Number(value) || 0);
 }
 
+function formatLiveTimeRemaining(remainingDistanceIn, velocityInPerS) {
+  const remaining = Number(remainingDistanceIn);
+  const velocity = Number(velocityInPerS);
+  if (!Number.isFinite(remaining) || remaining < 0) {
+    return null;
+  }
+  if (!Number.isFinite(velocity) || velocity <= 0.01) {
+    return "calculating...";
+  }
+  return formatSeconds(remaining / velocity);
+}
+
 function stopRobotPolling() {
   if (robotPollTimer) clearInterval(robotPollTimer);
   robotPollTimer = null;
@@ -1046,12 +1058,15 @@ async function pollRobotState() {
     updateRobotMarker();
     updateTelemetry(payload.telemetry || {});
 
+    const liveTimeRemaining = payload.remaining_distance != null
+      ? formatLiveTimeRemaining(payload.remaining_distance, robotVelocityInPerS)
+      : null;
     const statusText = [
       `Status: ${payload.status ?? "unknown"}`,
       payload.running ? "running" : "not running",
       payload.detail ? `| ${payload.detail}` : "",
       payload.remaining_distance != null ? `| remaining ${Number(payload.remaining_distance).toFixed(2)}"` : "",
-      `| velocity ${formatVelocity(robotVelocityInPerS)}`
+      liveTimeRemaining ? `| time left ${liveTimeRemaining}` : ""
     ].join(" ");
     setRobotStatus(statusText.trim());
     runBtn.disabled = !!payload.running;
