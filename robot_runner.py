@@ -272,6 +272,8 @@ def run_path(
                 corner_stop_remaining_s=debug.get("corner_stop_remaining_s", 0.0),
                 edge_override_active=edge_correction.edge_override_active,
                 edge_detail=edge_correction.detail,
+                left_edge_detected=ir_state.left_edge_detected,
+                right_edge_detected=ir_state.right_edge_detected,
                 telemetry={
                     "front_motor_temp_c": sensor_snapshot.telemetry.front_motor_temp_c,
                     "back_motor_temp_c": sensor_snapshot.telemetry.back_motor_temp_c,

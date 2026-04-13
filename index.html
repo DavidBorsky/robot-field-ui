@@ -711,7 +711,8 @@
       <div class="sensorStatusRow"><span class="debugLabel">Serial</span><span id="debugSerialBadge" class="sensorBadge disconnected">Disconnected</span></div>
       <div class="sensorStatusRow"><span class="debugLabel">Front motor</span><span id="debugFrontMotorBadge" class="sensorBadge disconnected">Disconnected</span></div>
       <div class="sensorStatusRow"><span class="debugLabel">Back motor</span><span id="debugBackMotorBadge" class="sensorBadge disconnected">Disconnected</span></div>
-      <div class="sensorStatusRow"><span class="debugLabel">IR sensors</span><span id="debugIrBadge" class="sensorBadge disconnected">Disconnected</span></div>
+      <div class="sensorStatusRow"><span class="debugLabel">Left IR</span><span id="debugLeftIrBadge" class="sensorBadge disconnected">Disconnected</span></div>
+      <div class="sensorStatusRow"><span class="debugLabel">Right IR</span><span id="debugRightIrBadge" class="sensorBadge disconnected">Disconnected</span></div>
       <div class="sensorStatusRow"><span class="debugLabel">Motor temp</span><span id="debugTempBadge" class="sensorBadge disconnected">Disconnected</span></div>
       <div class="sensorStatusRow"><span class="debugLabel">Battery %</span><span id="debugBatteryBadge" class="sensorBadge disconnected">Disconnected</span></div>
       <div class="sensorStatusRow"><span class="debugLabel">Camera</span><span id="debugCameraBadge" class="sensorBadge disconnected">Disconnected</span></div>
@@ -838,7 +839,8 @@ const debugCameraBadge = document.getElementById("debugCameraBadge");
 const debugSerialBadge = document.getElementById("debugSerialBadge");
 const debugFrontMotorBadge = document.getElementById("debugFrontMotorBadge");
 const debugBackMotorBadge = document.getElementById("debugBackMotorBadge");
-const debugIrBadge = document.getElementById("debugIrBadge");
+const debugLeftIrBadge = document.getElementById("debugLeftIrBadge");
+const debugRightIrBadge = document.getElementById("debugRightIrBadge");
 const debugTempBadge = document.getElementById("debugTempBadge");
 const debugBatteryBadge = document.getElementById("debugBatteryBadge");
 const debugApiState = document.getElementById("debugApiState");
@@ -1072,8 +1074,8 @@ function updateDebugPanel(payload = null) {
   const serialConnected = !!(robotApiConnected && (payload?.connection === "serial" || robotConnectionMode.value === "serial"));
   const frontMotorConnected = serialConnected && payload?.front_motor_rpm != null;
   const backMotorConnected = serialConnected && payload?.back_motor_rpm != null;
-  const encoderConnected = payload?.front_encoder_count != null || payload?.back_encoder_count != null;
-  const irConnected = payload?.edge_override_active || payload?.edge_detail === "following path edge correction" || false;
+  const leftIrConnected = payload?.left_edge_detected != null;
+  const rightIrConnected = payload?.right_edge_detected != null;
   const tempConnected = telemetry.front_motor_temp_c != null || telemetry.back_motor_temp_c != null;
   const batteryConnected = telemetry.battery_voltage != null;
 
@@ -1082,7 +1084,8 @@ function updateDebugPanel(payload = null) {
   setSensorBadge(debugSerialBadge, serialConnected);
   setSensorBadge(debugFrontMotorBadge, frontMotorConnected);
   setSensorBadge(debugBackMotorBadge, backMotorConnected);
-  setSensorBadge(debugIrBadge, !!irConnected);
+  setSensorBadge(debugLeftIrBadge, leftIrConnected);
+  setSensorBadge(debugRightIrBadge, rightIrConnected);
   setSensorBadge(debugTempBadge, tempConnected);
   setSensorBadge(debugBatteryBadge, batteryConnected);
 
