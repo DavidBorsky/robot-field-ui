@@ -173,6 +173,30 @@ The Uno sketch is also now structured to report sensor packets like:
 S,<left_edge>,<right_edge>,<heading_deg>,<front_count>,<back_count>,<front_rpm>,<back_rpm>,<front_temp_c>,<back_temp_c>,<battery_voltage>
 ```
 
+## Current Uno pin map
+
+For the current full L298N + two-encoder layout, the Uno sketch assumes:
+
+- Front motor PWM `ENA` -> Arduino `9`
+- Front motor direction `IN1` -> Arduino `7`
+- Front motor direction `IN2` -> Arduino `6`
+- Back motor PWM `ENB` -> Arduino `10`
+- Back motor direction `IN3` -> Arduino `8`
+- Back motor direction `IN4` -> Arduino `11`
+- Front encoder `A` -> Arduino `2`
+- Front encoder `B` -> Arduino `4`
+- Back encoder `A` -> Arduino `3`
+- Back encoder `B` -> Arduino `5`
+
+Optional inputs are still disabled by default until they are physically wired:
+
+- left IR edge sensor
+- right IR edge sensor
+- battery voltage analog sense
+
+The Uno sketch now also includes a command watchdog, so if fresh motor commands
+stop arriving for about `250 ms`, it hard-stops both motor channels.
+
 ## Edge safety behavior
 
 The two IR sensors are planned as left/right edge detectors, not line followers.
