@@ -4,15 +4,18 @@ This starts with a simulated gyro for development and a placeholder hardware
 implementation for when the real sensor is wired in.
 """
 
-from dataclasses import dataclass
-from typing import Protocol
+try:
+    from typing import Protocol
+except ImportError:  # pragma: no cover - Python < 3.8 fallback
+    class Protocol(object):
+        pass
 
 
-@dataclass(frozen=True)
 class GyroReading:
-    heading_deg: float
-    angular_rate_dps: float = 0.0
-    calibrated: bool = True
+    def __init__(self, heading_deg, angular_rate_dps=0.0, calibrated=True):
+        self.heading_deg = heading_deg
+        self.angular_rate_dps = angular_rate_dps
+        self.calibrated = calibrated
 
 
 class Gyro(Protocol):

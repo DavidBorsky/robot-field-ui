@@ -1,6 +1,4 @@
 """Odometry helpers for the current robot concepts."""
-
-from dataclasses import dataclass
 from math import atan2, cos, degrees, hypot, pi, radians, sin
 from typing import Optional
 
@@ -22,11 +20,11 @@ def wrap_heading_radians(angle: float) -> float:
     return angle
 
 
-@dataclass
 class Pose2D:
-    x: float = 0.0
-    y: float = 0.0
-    heading_rad: float = 0.0
+    def __init__(self, x=0.0, y=0.0, heading_rad=0.0):
+        self.x = x
+        self.y = y
+        self.heading_rad = heading_rad
 
     @property
     def heading_deg(self) -> float:
@@ -39,17 +37,28 @@ class Pose2D:
         return atan2(y - self.y, x - self.x)
 
 
-@dataclass
 class FrontBackMotionState:
-    front_distance_in: float = 0.0
-    back_distance_in: float = 0.0
-    front_velocity_in_per_s: float = 0.0
-    back_velocity_in_per_s: float = 0.0
-    robot_forward_velocity_in_per_s: float = 0.0
-    robot_strafe_velocity_in_per_s: float = 0.0
-    linear_velocity_in_per_s: float = 0.0
-    front_rpm: float = 0.0
-    back_rpm: float = 0.0
+    def __init__(
+        self,
+        front_distance_in=0.0,
+        back_distance_in=0.0,
+        front_velocity_in_per_s=0.0,
+        back_velocity_in_per_s=0.0,
+        robot_forward_velocity_in_per_s=0.0,
+        robot_strafe_velocity_in_per_s=0.0,
+        linear_velocity_in_per_s=0.0,
+        front_rpm=0.0,
+        back_rpm=0.0,
+    ):
+        self.front_distance_in = front_distance_in
+        self.back_distance_in = back_distance_in
+        self.front_velocity_in_per_s = front_velocity_in_per_s
+        self.back_velocity_in_per_s = back_velocity_in_per_s
+        self.robot_forward_velocity_in_per_s = robot_forward_velocity_in_per_s
+        self.robot_strafe_velocity_in_per_s = robot_strafe_velocity_in_per_s
+        self.linear_velocity_in_per_s = linear_velocity_in_per_s
+        self.front_rpm = front_rpm
+        self.back_rpm = back_rpm
 
 
 class DifferentialOdometry:

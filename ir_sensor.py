@@ -4,15 +4,13 @@ These sensors hang over the left and right edges of the robot and look for the
 dark carpet boundary so the robot can avoid falling off the playing surface.
 """
 
-from dataclasses import dataclass
-
 from drivetrain import FrontBackDrive, MotorCommand
 
 
-@dataclass(frozen=True)
 class IRSensorState:
-    left_edge_detected: bool = False
-    right_edge_detected: bool = False
+    def __init__(self, left_edge_detected=False, right_edge_detected=False):
+        self.left_edge_detected = left_edge_detected
+        self.right_edge_detected = right_edge_detected
 
     @property
     def any_edge_detected(self) -> bool:
@@ -23,11 +21,11 @@ class IRSensorState:
         return self.left_edge_detected and self.right_edge_detected
 
 
-@dataclass(frozen=True)
 class EdgeCorrection:
-    command: MotorCommand
-    edge_override_active: bool
-    detail: str
+    def __init__(self, command, edge_override_active, detail):
+        self.command = command
+        self.edge_override_active = edge_override_active
+        self.detail = detail
 
 
 class EdgeSafetyController:

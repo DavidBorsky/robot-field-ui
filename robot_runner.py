@@ -1,6 +1,5 @@
 import argparse
 import json
-from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional
 
@@ -22,10 +21,10 @@ BASE_DIR = Path(__file__).resolve().parent
 DEFAULT_PATH_FILE = Path("/mnt/c/Users/dbors/Downloads/robot-paths.json")
 
 
-@dataclass(frozen=True)
 class Waypoint:
-    x: float
-    y: float
+    def __init__(self, x, y):
+        self.x = float(x)
+        self.y = float(y)
 
 
 def load_robot_paths(path_file: Path = DEFAULT_PATH_FILE) -> dict:

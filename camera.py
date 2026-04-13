@@ -5,25 +5,35 @@ This file provides a simulated camera for development now and a placeholder
 hardware camera wrapper for later.
 """
 
-from dataclasses import dataclass
-from typing import Protocol
+try:
+    from typing import Protocol
+except ImportError:  # pragma: no cover - Python < 3.8 fallback
+    class Protocol(object):
+        pass
 
 
-@dataclass(frozen=True)
 class CameraFrame:
-    frame_id: int
-    width: int
-    height: int
-    source: str
+    def __init__(self, frame_id, width, height, source):
+        self.frame_id = frame_id
+        self.width = width
+        self.height = height
+        self.source = source
 
 
-@dataclass(frozen=True)
 class VisionTarget:
-    visible: bool
-    x_offset_norm: float = 0.0
-    y_offset_norm: float = 0.0
-    confidence: float = 0.0
-    label: str = ""
+    def __init__(
+        self,
+        visible,
+        x_offset_norm=0.0,
+        y_offset_norm=0.0,
+        confidence=0.0,
+        label="",
+    ):
+        self.visible = visible
+        self.x_offset_norm = x_offset_norm
+        self.y_offset_norm = y_offset_norm
+        self.confidence = confidence
+        self.label = label
 
 
 class Camera(Protocol):

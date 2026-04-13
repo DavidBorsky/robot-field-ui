@@ -6,7 +6,6 @@ the robot's lookahead circle with path segments, and it leaves room for future
 controllers such as Ramsete.
 """
 
-from dataclasses import dataclass
 from math import acos, sqrt
 from typing import Dict, List, Optional, Set, Tuple
 
@@ -36,18 +35,18 @@ def clamp(value: float, lo: float, hi: float) -> float:
     return max(lo, min(hi, value))
 
 
-@dataclass(frozen=True)
 class PathPoint:
-    x: float
-    y: float
+    def __init__(self, x, y):
+        self.x = x
+        self.y = y
 
 
-@dataclass(frozen=True)
 class ClosestPathSample:
-    point: PathPoint
-    segment_index: int
-    t: float
-    distance: float
+    def __init__(self, point, segment_index, t, distance):
+        self.point = point
+        self.segment_index = segment_index
+        self.t = t
+        self.distance = distance
 
 
 class FollowerController(Protocol):

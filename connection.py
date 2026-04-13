@@ -7,7 +7,6 @@ This starts with two modes:
 
 import argparse
 import time
-from dataclasses import dataclass
 from typing import Optional
 
 try:
@@ -30,35 +29,42 @@ except ImportError:  # pragma: no cover - optional dependency
     serial = None
 
 
-@dataclass(frozen=True)
 class RobotStatus:
-    connected: bool
-    mode: str
-    detail: str
+    def __init__(self, connected, mode, detail):
+        self.connected = connected
+        self.mode = mode
+        self.detail = detail
 
 
-@dataclass(frozen=True)
 class EncoderSnapshot:
-    front_count: int = 0
-    back_count: int = 0
-    front_rpm: float = 0.0
-    back_rpm: float = 0.0
-    counts_per_rev: float = ENCODER_COUNTS_PER_OUTPUT_REV
+    def __init__(
+        self,
+        front_count=0,
+        back_count=0,
+        front_rpm=0.0,
+        back_rpm=0.0,
+        counts_per_rev=ENCODER_COUNTS_PER_OUTPUT_REV,
+    ):
+        self.front_count = front_count
+        self.back_count = back_count
+        self.front_rpm = front_rpm
+        self.back_rpm = back_rpm
+        self.counts_per_rev = counts_per_rev
 
 
-@dataclass(frozen=True)
 class RobotTelemetry:
-    front_motor_temp_c: Optional[float] = None
-    back_motor_temp_c: Optional[float] = None
-    battery_voltage: Optional[float] = None
+    def __init__(self, front_motor_temp_c=None, back_motor_temp_c=None, battery_voltage=None):
+        self.front_motor_temp_c = front_motor_temp_c
+        self.back_motor_temp_c = back_motor_temp_c
+        self.battery_voltage = battery_voltage
 
 
-@dataclass(frozen=True)
 class SensorSnapshot:
-    ir: IRSensorState = IRSensorState()
-    heading_deg: Optional[float] = None
-    encoders: EncoderSnapshot = EncoderSnapshot()
-    telemetry: RobotTelemetry = RobotTelemetry()
+    def __init__(self, ir=None, heading_deg=None, encoders=None, telemetry=None):
+        self.ir = ir if ir is not None else IRSensorState()
+        self.heading_deg = heading_deg
+        self.encoders = encoders if encoders is not None else EncoderSnapshot()
+        self.telemetry = telemetry if telemetry is not None else RobotTelemetry()
 
 
 class RobotConnection(Protocol):

@@ -1,6 +1,4 @@
 """Reusable PID helpers for drivetrain and heading control."""
-
-from dataclasses import dataclass
 from math import pi
 from typing import Optional
 
@@ -16,16 +14,26 @@ def wrap_angle_radians(angle: float) -> float:
     return angle
 
 
-@dataclass
 class PIDConfig:
-    kp: float
-    ki: float = 0.0
-    kd: float = 0.0
-    output_min: Optional[float] = None
-    output_max: Optional[float] = None
-    integral_limit: Optional[float] = MAX_INTEGRAL
-    continuous: bool = False
-    derivative_on_measurement: bool = True
+    def __init__(
+        self,
+        kp,
+        ki=0.0,
+        kd=0.0,
+        output_min=None,
+        output_max=None,
+        integral_limit=MAX_INTEGRAL,
+        continuous=False,
+        derivative_on_measurement=True,
+    ):
+        self.kp = kp
+        self.ki = ki
+        self.kd = kd
+        self.output_min = output_min
+        self.output_max = output_max
+        self.integral_limit = integral_limit
+        self.continuous = continuous
+        self.derivative_on_measurement = derivative_on_measurement
 
 
 class PIDController:

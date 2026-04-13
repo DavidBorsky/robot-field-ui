@@ -1,6 +1,4 @@
 """Custom drivetrain helpers for a two-motor front/back mecanum layout."""
-
-from dataclasses import dataclass
 from math import atan2, cos, sin
 from typing import Dict, Optional, Tuple
 
@@ -23,10 +21,10 @@ def clamp(value: float, lo: float, hi: float) -> float:
     return max(lo, min(hi, value))
 
 
-@dataclass
 class MotorCommand:
-    front_output: float
-    back_output: float
+    def __init__(self, front_output, back_output):
+        self.front_output = front_output
+        self.back_output = back_output
 
 
 class FrontBackDrive:
