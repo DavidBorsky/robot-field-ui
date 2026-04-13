@@ -528,6 +528,42 @@
     font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
     color: #111;
   }
+
+  .sensorStatusGrid {
+    display: grid;
+    gap: 8px;
+  }
+
+  .sensorStatusRow {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    font-size: 13px;
+  }
+
+  .sensorBadge {
+    min-width: 96px;
+    text-align: center;
+    padding: 5px 10px;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 800;
+    letter-spacing: 0.01em;
+    border: 1px solid transparent;
+  }
+
+  .sensorBadge.connected {
+    background: rgba(34, 166, 88, 0.14);
+    color: #17663a;
+    border-color: rgba(34, 166, 88, 0.3);
+  }
+
+  .sensorBadge.disconnected {
+    background: rgba(201, 47, 47, 0.12);
+    color: #9b2020;
+    border-color: rgba(201, 47, 47, 0.28);
+  }
 </style>
 </head>
 
@@ -676,6 +712,19 @@
   </div>
 
   <div class="debugSection">
+    <div class="debugSectionTitle">Sensor Status</div>
+    <div class="sensorStatusGrid">
+      <div class="sensorStatusRow"><span class="debugLabel">Pi API</span><span id="debugApiBadge" class="sensorBadge disconnected">Disconnected</span></div>
+      <div class="sensorStatusRow"><span class="debugLabel">Camera</span><span id="debugCameraBadge" class="sensorBadge disconnected">Disconnected</span></div>
+      <div class="sensorStatusRow"><span class="debugLabel">Serial</span><span id="debugSerialBadge" class="sensorBadge disconnected">Disconnected</span></div>
+      <div class="sensorStatusRow"><span class="debugLabel">Encoders</span><span id="debugEncoderBadge" class="sensorBadge disconnected">Disconnected</span></div>
+      <div class="sensorStatusRow"><span class="debugLabel">IR sensors</span><span id="debugIrBadge" class="sensorBadge disconnected">Disconnected</span></div>
+      <div class="sensorStatusRow"><span class="debugLabel">Motor temp</span><span id="debugTempBadge" class="sensorBadge disconnected">Disconnected</span></div>
+      <div class="sensorStatusRow"><span class="debugLabel">Battery sense</span><span id="debugBatteryBadge" class="sensorBadge disconnected">Disconnected</span></div>
+    </div>
+  </div>
+
+  <div class="debugSection">
     <div class="debugSectionTitle">Connection</div>
     <div class="debugRow"><span class="debugLabel">API:</span> <span id="debugApiState" class="debugValue">offline</span></div>
     <div class="debugRow"><span class="debugLabel">Mode:</span> <span id="debugConnectionMode" class="debugValue">serial</span></div>
@@ -783,6 +832,13 @@ const debugToggleBtn = document.getElementById("debugToggleBtn");
 const debugDrawer = document.getElementById("debugDrawer");
 const debugBackdrop = document.getElementById("debugBackdrop");
 const debugCloseBtn = document.getElementById("debugCloseBtn");
+const debugApiBadge = document.getElementById("debugApiBadge");
+const debugCameraBadge = document.getElementById("debugCameraBadge");
+const debugSerialBadge = document.getElementById("debugSerialBadge");
+const debugEncoderBadge = document.getElementById("debugEncoderBadge");
+const debugIrBadge = document.getElementById("debugIrBadge");
+const debugTempBadge = document.getElementById("debugTempBadge");
+const debugBatteryBadge = document.getElementById("debugBatteryBadge");
 const debugApiState = document.getElementById("debugApiState");
 const debugConnectionMode = document.getElementById("debugConnectionMode");
 const debugRunnerStatus = document.getElementById("debugRunnerStatus");
@@ -855,6 +911,7 @@ let robotApiConnected = false;
 let robotMoving = false;
 let robotVelocityInPerS = 0;
 let robotMotorRpmEstimate = 0;
+let cameraFeedConnected = false;
 let liveTimeRemainingSeconds = null;
 let lastVelocityPose = null;
 let lastVelocityTimestampMs = null;
@@ -1002,7 +1059,28 @@ function setDebugDrawerOpen(isOpen) {
   debugBackdrop.setAttribute("aria-hidden", isOpen ? "false" : "true");
 }
 
+function setSensorBadge(element, connected, connectedText = "Connected", disconnectedText = "Disconnected") {
+  element.textContent = connected ? connectedText : disconnectedText;
+  element.classList.toggle("connected", connected);
+  element.classList.toggle("disconnected", !connected);
+}
+
 function updateDebugPanel(payload = null) {
+  const telemetry = payload?.telemetry || {};
+  const serialConnected = !!(robotApiConnected && (payload?.connection === "serial" || robotConnectionMode.value === "serial"));
+  const encoderConnected = payload?.front_encoder_count != null || payload?.back_encoder_count != null;
+  const irConnected = payload?.edge_override_active || payload?.edge_detail === "following path edge correction" || false;
+  const tempConnected = telemetry.front_motor_temp_c != null || telemetry.back_motor_temp_c != null;
+  const batteryConnected = telemetry.battery_voltage != null;
+
+  setSensorBadge(debugApiBadge, robotApiConnected);
+  setSensorBadge(debugCameraBadge, cameraFeedConnected);
+  setSensorBadge(debugSerialBadge, serialConnected);
+  setSensorBadge(debugEncoderBadge, encoderConnected);
+  setSensorBadge(debugIrBadge, !!irConnected);
+  setSensorBadge(debugTempBadge, tempConnected);
+  setSensorBadge(debugBatteryBadge, batteryConnected);
+
   debugApiState.textContent = robotApiConnected ? "online" : "offline";
   debugConnectionMode.textContent = payload?.connection || robotConnectionMode.value || "--";
   debugRunnerStatus.textContent = payload?.status || (localSimulation.active ? "simulated" : "idle");
@@ -1289,6 +1367,8 @@ async function updateCameraFeed() {
     cameraFeed.style.display = "none";
     cameraPlaceholder.textContent = "Camera unavailable";
     cameraPlaceholder.style.display = "flex";
+    cameraFeedConnected = false;
+    updateDebugPanel(null);
   }
 }
 
@@ -1358,10 +1438,21 @@ async function pollRobotState() {
     cameraFeed.style.display = "none";
     cameraPlaceholder.textContent = "Camera unavailable";
     cameraPlaceholder.style.display = "flex";
+    cameraFeedConnected = false;
   } finally {
     robotPollInFlight = false;
   }
 }
+
+cameraFeed.addEventListener("load", () => {
+  cameraFeedConnected = true;
+  updateDebugPanel();
+});
+
+cameraFeed.addEventListener("error", () => {
+  cameraFeedConnected = false;
+  updateDebugPanel();
+});
 
 function startRobotPolling() {
   stopRobotPolling();
