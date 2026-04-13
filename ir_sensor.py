@@ -4,8 +4,6 @@ These sensors hang over the left and right edges of the robot and look for the
 dark carpet boundary so the robot can avoid falling off the playing surface.
 """
 
-from __future__ import annotations
-
 from dataclasses import dataclass
 
 from drivetrain import FrontBackDrive, MotorCommand

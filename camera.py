@@ -5,8 +5,6 @@ This file provides a simulated camera for development now and a placeholder
 hardware camera wrapper for later.
 """
 
-from __future__ import annotations
-
 from dataclasses import dataclass
 from typing import Protocol
 

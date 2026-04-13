@@ -1,7 +1,5 @@
 """Reusable PID helpers for drivetrain and heading control."""
 
-from __future__ import annotations
-
 from dataclasses import dataclass
 from math import pi
 from typing import Optional

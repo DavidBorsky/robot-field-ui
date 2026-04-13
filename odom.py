@@ -1,7 +1,5 @@
 """Odometry helpers for the current robot concepts."""
 
-from __future__ import annotations
-
 from dataclasses import dataclass
 from math import atan2, cos, degrees, hypot, pi, radians, sin
 from typing import Optional

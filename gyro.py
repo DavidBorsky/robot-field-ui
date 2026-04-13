@@ -4,8 +4,6 @@ This starts with a simulated gyro for development and a placeholder hardware
 implementation for when the real sensor is wired in.
 """
 
-from __future__ import annotations
-
 from dataclasses import dataclass
 from typing import Protocol
 

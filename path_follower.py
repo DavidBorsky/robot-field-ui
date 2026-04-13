@@ -6,8 +6,6 @@ the robot's lookahead circle with path segments, and it leaves room for future
 controllers such as Ramsete.
 """
 
-from __future__ import annotations
-
 from dataclasses import dataclass
 from math import acos, sqrt
 from typing import Dict, List, Optional, Set, Tuple

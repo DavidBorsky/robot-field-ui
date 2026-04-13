@@ -5,8 +5,6 @@ This starts with two modes:
 - optional serial output for the real Pi/Arduino link
 """
 
-from __future__ import annotations
-
 import argparse
 import time
 from dataclasses import dataclass

@@ -1,7 +1,5 @@
 """Custom drivetrain helpers for a two-motor front/back mecanum layout."""
 
-from __future__ import annotations
-
 from dataclasses import dataclass
 from math import atan2, cos, sin
 from typing import Dict, Optional, Tuple
