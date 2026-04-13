@@ -672,6 +672,7 @@ let robotApiConnected = false;
 let robotMoving = false;
 let robotVelocityInPerS = 0;
 let robotMotorRpmEstimate = 0;
+let liveTimeRemainingSeconds = null;
 let lastVelocityPose = null;
 let lastVelocityTimestampMs = null;
 let robotTrailPoints = [];
@@ -1009,16 +1010,28 @@ function setRobotMotorRpm(value) {
   robotMotorRpmEstimate = Math.max(0, Number(value) || 0);
 }
 
-function formatLiveTimeRemaining(remainingDistanceIn, velocityInPerS) {
+function formatLiveTimeRemaining(remainingDistanceIn, velocityInPerS, isRunning) {
+  if (!isRunning) {
+    liveTimeRemainingSeconds = null;
+    return null;
+  }
+
   const remaining = Number(remainingDistanceIn);
   const velocity = Number(velocityInPerS);
   if (!Number.isFinite(remaining) || remaining < 0) {
-    return null;
+    return liveTimeRemainingSeconds == null ? null : formatSeconds(liveTimeRemainingSeconds);
   }
   if (!Number.isFinite(velocity) || velocity <= 0.01) {
-    return "calculating...";
+    return liveTimeRemainingSeconds == null ? "calculating..." : formatSeconds(liveTimeRemainingSeconds);
   }
-  return formatSeconds(remaining / velocity);
+
+  const estimatedSeconds = remaining / velocity;
+  if (liveTimeRemainingSeconds == null) {
+    liveTimeRemainingSeconds = estimatedSeconds;
+  } else {
+    liveTimeRemainingSeconds = Math.max(0, Math.min(liveTimeRemainingSeconds, estimatedSeconds));
+  }
+  return formatSeconds(liveTimeRemainingSeconds);
 }
 
 function stopRobotPolling() {
@@ -1059,8 +1072,8 @@ async function pollRobotState() {
     updateTelemetry(payload.telemetry || {});
 
     const liveTimeRemaining = payload.remaining_distance != null
-      ? formatLiveTimeRemaining(payload.remaining_distance, robotVelocityInPerS)
-      : null;
+      ? formatLiveTimeRemaining(payload.remaining_distance, robotVelocityInPerS, !!payload.running)
+      : formatLiveTimeRemaining(null, null, !!payload.running);
     const statusText = [
       `Status: ${payload.status ?? "unknown"}`,
       payload.running ? "running" : "not running",
@@ -1075,6 +1088,7 @@ async function pollRobotState() {
   } catch (err) {
     robotApiConnected = false;
     robotMoving = false;
+    liveTimeRemainingSeconds = null;
     setRobotVelocityFromModel(0);
     setRobotMotorRpm(0);
     updateRobotMarker();
@@ -1166,6 +1180,7 @@ resetBtn.addEventListener("click", async () => {
     robotPose.y = start.y;
     robotPose.heading = 0;
     robotMoving = false;
+    liveTimeRemainingSeconds = null;
     setRobotVelocityFromModel(0);
     setRobotMotorRpm(0);
     lastVelocityPose = { x: robotPose.x, y: robotPose.y };
@@ -1211,6 +1226,7 @@ resetBtn.addEventListener("click", async () => {
     robotPose.y = Number(payload.pose?.y ?? start.y);
     robotPose.heading = Number(payload.pose?.heading_deg ?? 0);
     robotMoving = false;
+    liveTimeRemainingSeconds = null;
     setRobotVelocityFromModel(0);
     setRobotMotorRpm(0);
     lastVelocityPose = { x: robotPose.x, y: robotPose.y };
