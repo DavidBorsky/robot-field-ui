@@ -117,6 +117,14 @@ class PurePursuitFollower:
             and pose.distance_to(goal.x, goal.y) <= self.goal_tolerance_in
         )
 
+    def _pose_hit_field_boundary(self, pose: Pose2D) -> bool:
+        return (
+            pose.x <= PLAYABLE_MIN_X_IN
+            or pose.x >= PLAYABLE_MAX_X_IN
+            or pose.y <= PLAYABLE_MIN_Y_IN
+            or pose.y >= PLAYABLE_MAX_Y_IN
+        )
+
     def _closest_point_on_segment(
         self,
         pose: Pose2D,
@@ -337,6 +345,21 @@ class PurePursuitFollower:
     ) -> Tuple[MotorCommand, Dict[str, float]]:
         if not self.path:
             return MotorCommand(0.0, 0.0), {"finished": True, "reason": "empty path"}
+
+        if self._pose_hit_field_boundary(pose):
+            goal = self.path[-1]
+            return MotorCommand(0.0, 0.0), {
+                "finished": False,
+                "reason": "field_boundary_stop",
+                "paused_for_corner": False,
+                "corner_stop_remaining_s": 0.0,
+                "speed_scale": 0.0,
+                "turn_severity": 0.0,
+                "remaining_distance": pose.distance_to(goal.x, goal.y),
+                "current_index": self.current_index,
+                "lookahead_x": pose.x,
+                "lookahead_y": pose.y,
+            }
 
         if self.corner_stop_remaining_s > 0.0:
             self.corner_stop_remaining_s = max(0.0, self.corner_stop_remaining_s - dt)

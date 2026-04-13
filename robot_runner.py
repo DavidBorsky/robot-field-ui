@@ -228,7 +228,9 @@ def run_path(
                 mode=mode,
                 status="running",
                 detail=(
-                    "edge override active"
+                    "stopped at field boundary"
+                    if debug.get("reason") == "field_boundary_stop"
+                    else "edge override active"
                     if edge_correction.edge_override_active
                     else "following path"
                 ),
