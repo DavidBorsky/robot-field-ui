@@ -451,4 +451,4 @@ def create_follower(controller: str = "pure_pursuit") -> FollowerController:
         return PurePursuitFollower()
     if controller == "ramsete":
         return RamseteFollower()
-    raise ValueError(f"Unknown follower controller: {controller}")
+    raise ValueError("Unknown follower controller: {}".format(controller))

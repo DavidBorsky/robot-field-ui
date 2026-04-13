@@ -73,15 +73,15 @@ def run_path(
 
     if len(waypoints) < 2:
         print(
-            f"{mode} path needs at least 2 waypoints before it can run. "
-            f"Export a path from the UI into {path_file.name} first."
+            "{} path needs at least 2 waypoints before it can run. "
+            "Export a path from the UI into {} first.".format(mode, path_file.name)
         )
         emit_status(
             status_callback,
             running=False,
             mode=mode,
             status="idle",
-            detail=f"{mode} path needs at least 2 waypoints",
+            detail="{} path needs at least 2 waypoints".format(mode),
             pose={"x": 0.0, "y": 0.0, "heading_deg": 0.0},
             velocity_in_per_s=0.0,
             motor_rpm_estimate=0.0,
@@ -91,12 +91,16 @@ def run_path(
         )
         return
 
-    print(f"Loaded {len(waypoints)} waypoint(s) for mode '{mode}'")
-    print(f"Units: {payload.get('units', 'unknown')}")
-    print(f"Field: {payload.get('field', {})}")
-    print(f"Follower: {follower_controller}")
-    print(f"Connection mode: {'simulated' if simulate_connection else f'serial ({serial_port})'}")
-    print(f"Power scale: {power_scale:.2f}")
+    print("Loaded {} waypoint(s) for mode '{}'".format(len(waypoints), mode))
+    print("Units: {}".format(payload.get("units", "unknown")))
+    print("Field: {}".format(payload.get("field", {})))
+    print("Follower: {}".format(follower_controller))
+    print(
+        "Connection mode: {}".format(
+            "simulated" if simulate_connection else "serial ({})".format(serial_port)
+        )
+    )
+    print("Power scale: {:.2f}".format(power_scale))
 
     odom = FrontBackMecanumOdometry()
     odom.reset(x=waypoints[0].x, y=waypoints[0].y, heading_deg=0.0)
@@ -105,7 +109,7 @@ def run_path(
         running=True,
         mode=mode,
         status="ready",
-        detail=f"loaded {len(waypoints)} waypoint(s)",
+        detail="loaded {} waypoint(s)".format(len(waypoints)),
         follower=follower_controller,
         connection="simulated" if simulate_connection else "serial",
         power_scale=power_scale,
@@ -137,7 +141,7 @@ def run_path(
     connection.connect()
 
     for index, waypoint in enumerate(waypoints, start=1):
-        print(f"Waypoint {index}: x={waypoint.x:.2f}, y={waypoint.y:.2f}")
+        print("Waypoint {}: x={:.2f}, y={:.2f}".format(index, waypoint.x, waypoint.y))
 
     print("\nFollower preview:")
     try:
@@ -190,27 +194,36 @@ def run_path(
             edge_correction = edge_safety.apply(requested_command, ir_state)
             command = scale_motor_command(edge_correction.command, power_scale)
             print(
-                f"- step {step}: "
-                f"x={odom.pose.x:.2f}, y={odom.pose.y:.2f}, "
-                f"front={command.front_output:.3f}, back={command.back_output:.3f}, "
-                f"heading={gyro_reading.heading_deg:.2f}, "
-                f"frame={frame.frame_id}, "
-                f"lookahead=({debug['lookahead_x']:.2f}, {debug['lookahead_y']:.2f}), "
-                f"speed={debug['speed_scale']:.2f}, "
-                f"turn={debug['turn_severity']:.2f}, "
-                f"remaining={debug['remaining_distance']:.2f}, "
-                f"edge_override={edge_correction.edge_override_active}"
+                "- step {}: x={:.2f}, y={:.2f}, front={:.3f}, back={:.3f}, "
+                "heading={:.2f}, frame={}, lookahead=({:.2f}, {:.2f}), speed={:.2f}, "
+                "turn={:.2f}, remaining={:.2f}, edge_override={}".format(
+                    step,
+                    odom.pose.x,
+                    odom.pose.y,
+                    command.front_output,
+                    command.back_output,
+                    gyro_reading.heading_deg,
+                    frame.frame_id,
+                    debug["lookahead_x"],
+                    debug["lookahead_y"],
+                    debug["speed_scale"],
+                    debug["turn_severity"],
+                    debug["remaining_distance"],
+                    edge_correction.edge_override_active,
+                )
             )
             if debug.get("paused_for_corner"):
-                print(f"  corner stop: waiting {debug.get('corner_stop_remaining_s', 0.0):.2f}s")
+                print("  corner stop: waiting {:.2f}s".format(debug.get("corner_stop_remaining_s", 0.0)))
             if edge_correction.edge_override_active:
-                print(f"  safety: {edge_correction.detail}")
+                print("  safety: {}".format(edge_correction.detail))
             if vision_target.visible:
                 print(
-                    f"  vision: target={vision_target.label} "
-                    f"x_offset={vision_target.x_offset_norm:.2f} "
-                    f"y_offset={vision_target.y_offset_norm:.2f} "
-                            f"confidence={vision_target.confidence:.2f}"
+                    "  vision: target={} x_offset={:.2f} y_offset={:.2f} confidence={:.2f}".format(
+                        vision_target.label,
+                        vision_target.x_offset_norm,
+                        vision_target.y_offset_norm,
+                        vision_target.confidence,
+                    )
                 )
             emit_status(
                 status_callback,
@@ -297,9 +310,9 @@ def run_path(
     finally:
         connection.stop()
         final_connection_status = connection.status()
-        print(f"Connection status: {final_connection_status}")
+        print("Connection status: {}".format(final_connection_status))
         final_status = "idle"
-        final_detail = f"connection closed: {final_connection_status.detail}"
+        final_detail = "connection closed: {}".format(final_connection_status.detail)
         if path_completed:
             final_status = "complete"
             final_detail = "run finished and connection closed"

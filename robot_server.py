@@ -179,7 +179,7 @@ def build_handler(
                 mode=mode,
                 connection=connection,
                 status="starting",
-                detail=f"launching {mode} run",
+                detail="launching {} run".format(mode),
                 path_file=str(path_file),
                 power_scale=power_scale,
             )
@@ -256,7 +256,7 @@ def main() -> None:
         default_baud=args.baud,
     )
     server = ThreadingHTTPServer((args.host, args.port), handler)
-    print(f"Robot server listening on http://{args.host}:{args.port}")
+    print("Robot server listening on http://{}:{}".format(args.host, args.port))
     server.serve_forever()
 
 

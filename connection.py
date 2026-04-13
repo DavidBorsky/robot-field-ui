@@ -92,8 +92,9 @@ class SimulatedConnection:
             raise RuntimeError("SimulatedConnection is not connected")
         self.last_command = command
         print(
-            f"[sim] motor command -> front={command.front_output:.3f}, "
-            f"back={command.back_output:.3f}"
+            "[sim] motor command -> front={:.3f}, back={:.3f}".format(
+                command.front_output, command.back_output
+            )
         )
 
     def set_sensor_snapshot(self, snapshot: SensorSnapshot) -> None:
@@ -135,8 +136,9 @@ class SimulatedConnection:
 
     def status(self) -> RobotStatus:
         detail = (
-            f"last front={self.last_command.front_output:.3f}, "
-            f"back={self.last_command.back_output:.3f}"
+            "last front={:.3f}, back={:.3f}".format(
+                self.last_command.front_output, self.last_command.back_output
+            )
         )
         return RobotStatus(connected=self.connected, mode="simulated", detail=detail)
 
@@ -234,13 +236,13 @@ class SerialArduinoConnection:
             if parsed is not None:
                 self.latest_sensor_snapshot = parsed
             else:
-                print(f"[serial] {line}")
+                print("[serial] {}".format(line))
             if deadline is None and handle.in_waiting <= 0:
                 break
 
     def send_motor_command(self, command: MotorCommand) -> None:
         handle = self._require_handle()
-        payload = f"M,{command.front_output:.4f},{command.back_output:.4f}\n"
+        payload = "M,{:.4f},{:.4f}\n".format(command.front_output, command.back_output)
         handle.write(payload.encode("utf-8"))
         handle.flush()
         self._drain_input(duration_s=0.02)
@@ -259,7 +261,7 @@ class SerialArduinoConnection:
 
     def status(self) -> RobotStatus:
         connected = self.serial_handle is not None
-        detail = f"port={self.port} baud={self.baudrate}"
+        detail = "port={} baud={}".format(self.port, self.baudrate)
         return RobotStatus(connected=connected, mode="serial", detail=detail)
 
 
@@ -277,10 +279,10 @@ def run_serial_smoke_test(port: str, baudrate: int = 115200) -> None:
     connection = SerialArduinoConnection(port=port, baudrate=baudrate)
     connection.connect()
     try:
-        print(f"Connected to Arduino on {port} at {baudrate} baud")
+        print("Connected to Arduino on {} at {} baud".format(port, baudrate))
         connection.send_motor_command(MotorCommand(front_output=0.5, back_output=-0.2))
         connection.send_motor_command(MotorCommand(front_output=0.0, back_output=0.0))
-        print(f"Status: {connection.status()}")
+        print("Status: {}".format(connection.status()))
     finally:
         connection.close()
 

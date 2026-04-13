@@ -83,7 +83,7 @@ class HardwareCamera:
     def read_frame(self) -> CameraFrame:
         if not self.running:
             raise RuntimeError("HardwareCamera is not running")
-        return CameraFrame(frame_id=0, width=640, height=480, source=f"camera-{self.index}")
+        return CameraFrame(frame_id=0, width=640, height=480, source="camera-{}".format(self.index))
 
     def get_target(self) -> VisionTarget:
         return VisionTarget(visible=False)
