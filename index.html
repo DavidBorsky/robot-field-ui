@@ -1114,14 +1114,7 @@ async function pollRobotState() {
     // Update camera feed
     updateCameraFeed();
 
-    const routeTimeRemaining = payload.running ? estimateLiveRouteTimeRemaining() : null;
-    const liveTimeRemaining = routeTimeRemaining != null
-      ? formatSeconds(routeTimeRemaining)
-      : (
-        payload.remaining_distance != null
-          ? formatLiveTimeRemaining(payload.remaining_distance, robotVelocityInPerS, !!payload.running)
-          : formatLiveTimeRemaining(null, null, !!payload.running)
-      );
+    const liveTimeRemaining = estimateDisplayedLiveTimeRemaining(payload);
     const statusText = [
       `Status: ${payload.status ?? "unknown"}`,
       payload.running ? "running" : "not running",
@@ -1532,6 +1525,25 @@ function estimateLiveRouteTimeRemaining() {
     robotVelocityInPerS,
     new Set()
   );
+}
+
+function estimateDisplayedLiveTimeRemaining(payload = {}) {
+  const activeCornerPauseS = Math.max(0, Number(payload.corner_stop_remaining_s) || 0);
+  const routeTimeRemaining = payload.running ? estimateLiveRouteTimeRemaining() : null;
+  if (routeTimeRemaining != null) {
+    return formatSeconds(activeCornerPauseS + routeTimeRemaining);
+  }
+
+  const fallback = payload.remaining_distance != null
+    ? formatLiveTimeRemaining(payload.remaining_distance, robotVelocityInPerS, !!payload.running)
+    : formatLiveTimeRemaining(null, null, !!payload.running);
+  if (fallback == null) {
+    return null;
+  }
+  if (fallback === "calculating..." || activeCornerPauseS <= 0) {
+    return fallback;
+  }
+  return formatSeconds(activeCornerPauseS);
 }
 
 function updateCourseEstimate() {
