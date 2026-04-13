@@ -4,16 +4,17 @@ import argparse
 import json
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Callable
 
 from camera import SimulatedCamera, VisionTarget, create_camera
 from connection import create_connection
 from constants import (
     DEFAULT_CONTROL_DT_S,
+    DEFAULT_POWER_SCALE,
     DEFAULT_SERIAL_PORT_LINUX,
-    SIM_MAX_FORWARD_SPEED_IN_PER_S,
     SIM_MAX_STEPS_PER_RUN,
-    SIM_MAX_STRAFE_SPEED_IN_PER_S,
 )
+from drivetrain import MotorCommand
 from gyro import SimulatedGyro, create_gyro
 from ir_sensor import EdgeSafetyController, IRSensorState
 from odom import FrontBackMecanumOdometry
@@ -44,21 +45,16 @@ def get_waypoints(payload: dict, mode: str = "auton") -> list[Waypoint]:
     return [Waypoint(float(x), float(y)) for x, y in raw_points]
 
 
-def apply_simulated_motion(
-    odom: FrontBackMecanumOdometry,
-    front_output: float,
-    back_output: float,
-    dt: float = DEFAULT_CONTROL_DT_S,
-) -> None:
-    front_distance_in = front_output * SIM_MAX_FORWARD_SPEED_IN_PER_S * dt
-    back_distance_in = back_output * SIM_MAX_FORWARD_SPEED_IN_PER_S * dt
+def emit_status(status_callback: Callable[[dict], None] | None, **payload) -> None:
+    if status_callback is None:
+        return
+    status_callback(payload)
 
-    # Add a small extra strafe response so the virtual robot exposes more of the
-    # front/back mecanum behavior during pre-hardware testing.
-    strafe_bias_in = (front_output - back_output) * SIM_MAX_STRAFE_SPEED_IN_PER_S * dt * 0.5
-    odom.update(
-        front_distance_in=front_distance_in + strafe_bias_in,
-        back_distance_in=back_distance_in - strafe_bias_in,
+
+def scale_motor_command(command: MotorCommand, power_scale: float) -> MotorCommand:
+    return MotorCommand(
+        front_output=command.front_output * power_scale,
+        back_output=command.back_output * power_scale,
     )
 
 
@@ -69,6 +65,8 @@ def run_path(
     follower_controller: str = "pure_pursuit",
     serial_port: str = "/dev/ttyACM0",
     serial_baud: int = 115200,
+    power_scale: float = DEFAULT_POWER_SCALE,
+    status_callback: Callable[[dict], None] | None = None,
 ) -> None:
     payload = load_robot_paths(path_file)
     waypoints = get_waypoints(payload, mode)
@@ -78,6 +76,19 @@ def run_path(
             f"{mode} path needs at least 2 waypoints before it can run. "
             f"Export a path from the UI into {path_file.name} first."
         )
+        emit_status(
+            status_callback,
+            running=False,
+            mode=mode,
+            status="idle",
+            detail=f"{mode} path needs at least 2 waypoints",
+            pose={"x": 0.0, "y": 0.0, "heading_deg": 0.0},
+            velocity_in_per_s=0.0,
+            motor_rpm_estimate=0.0,
+            velocity_source="encoder",
+            step=0,
+            max_steps=0,
+        )
         return
 
     print(f"Loaded {len(waypoints)} waypoint(s) for mode '{mode}'")
@@ -85,9 +96,32 @@ def run_path(
     print(f"Field: {payload.get('field', {})}")
     print(f"Follower: {follower_controller}")
     print(f"Connection mode: {'simulated' if simulate_connection else f'serial ({serial_port})'}")
+    print(f"Power scale: {power_scale:.2f}")
 
     odom = FrontBackMecanumOdometry()
     odom.reset(x=waypoints[0].x, y=waypoints[0].y, heading_deg=0.0)
+    emit_status(
+        status_callback,
+        running=True,
+        mode=mode,
+        status="ready",
+        detail=f"loaded {len(waypoints)} waypoint(s)",
+        follower=follower_controller,
+        connection="simulated" if simulate_connection else "serial",
+        power_scale=power_scale,
+        pose={
+            "x": odom.pose.x,
+            "y": odom.pose.y,
+            "heading_deg": odom.pose.heading_deg,
+        },
+        step=0,
+        max_steps=SIM_MAX_STEPS_PER_RUN,
+        waypoint_count=len(waypoints),
+        units=payload.get("units", "unknown"),
+        velocity_in_per_s=0.0,
+        motor_rpm_estimate=0.0,
+        velocity_source="encoder",
+    )
 
     follower = create_follower(follower_controller)
     follower.load_path([PathPoint(x=waypoint.x, y=waypoint.y) for waypoint in waypoints])
@@ -108,14 +142,8 @@ def run_path(
     print("\nFollower preview:")
     try:
         last_command = None
+        path_completed = False
         for step in range(1, SIM_MAX_STEPS_PER_RUN + 1):
-            if simulate_connection and last_command is not None:
-                apply_simulated_motion(
-                    odom=odom,
-                    front_output=last_command.front_output,
-                    back_output=last_command.back_output,
-                )
-
             sensor_snapshot = connection.read_sensors()
             ir_state = sensor_snapshot.ir
 
@@ -148,10 +176,19 @@ def run_path(
                     right_edge_detected=ir_state.right_edge_detected,
                 )
 
-            odom.update(front_distance_in=0.0, back_distance_in=0.0, heading_deg=gyro_reading.heading_deg)
+            reported_heading_deg = sensor_snapshot.heading_deg
+            odom.update_from_encoder_snapshot(
+                front_count=sensor_snapshot.encoders.front_count,
+                back_count=sensor_snapshot.encoders.back_count,
+                front_rpm=sensor_snapshot.encoders.front_rpm,
+                back_rpm=sensor_snapshot.encoders.back_rpm,
+                dt=DEFAULT_CONTROL_DT_S,
+                heading_deg=reported_heading_deg if reported_heading_deg is not None else gyro_reading.heading_deg,
+                counts_per_rev=sensor_snapshot.encoders.counts_per_rev,
+            )
             requested_command, debug = follower.update(pose=odom.pose)
             edge_correction = edge_safety.apply(requested_command, ir_state)
-            command = edge_correction.command
+            command = scale_motor_command(edge_correction.command, power_scale)
             print(
                 f"- step {step}: "
                 f"x={odom.pose.x:.2f}, y={odom.pose.y:.2f}, "
@@ -164,6 +201,8 @@ def run_path(
                 f"remaining={debug['remaining_distance']:.2f}, "
                 f"edge_override={edge_correction.edge_override_active}"
             )
+            if debug.get("paused_for_corner"):
+                print(f"  corner stop: waiting {debug.get('corner_stop_remaining_s', 0.0):.2f}s")
             if edge_correction.edge_override_active:
                 print(f"  safety: {edge_correction.detail}")
             if vision_target.visible:
@@ -173,11 +212,82 @@ def run_path(
                     f"y_offset={vision_target.y_offset_norm:.2f} "
                             f"confidence={vision_target.confidence:.2f}"
                 )
+            emit_status(
+                status_callback,
+                running=True,
+                mode=mode,
+                status="running",
+                detail=(
+                    "edge override active"
+                    if edge_correction.edge_override_active
+                    else "following path"
+                ),
+                pose={
+                    "x": odom.pose.x,
+                    "y": odom.pose.y,
+                    "heading_deg": odom.pose.heading_deg,
+                },
+                command={
+                    "front_output": command.front_output,
+                    "back_output": command.back_output,
+                },
+                lookahead={
+                    "x": debug["lookahead_x"],
+                    "y": debug["lookahead_y"],
+                },
+                step=step,
+                max_steps=SIM_MAX_STEPS_PER_RUN,
+                waypoint_index=debug["current_index"],
+                remaining_distance=debug["remaining_distance"],
+                turn_severity=debug["turn_severity"],
+                speed_scale=debug["speed_scale"],
+                velocity_in_per_s=odom.motion.linear_velocity_in_per_s,
+                forward_velocity_in_per_s=odom.motion.robot_forward_velocity_in_per_s,
+                strafe_velocity_in_per_s=odom.motion.robot_strafe_velocity_in_per_s,
+                front_encoder_count=sensor_snapshot.encoders.front_count,
+                back_encoder_count=sensor_snapshot.encoders.back_count,
+                front_motor_rpm=sensor_snapshot.encoders.front_rpm,
+                back_motor_rpm=sensor_snapshot.encoders.back_rpm,
+                motor_rpm_estimate=(
+                    abs(sensor_snapshot.encoders.front_rpm) + abs(sensor_snapshot.encoders.back_rpm)
+                ) / 2.0,
+                velocity_source="encoder",
+                power_scale=power_scale,
+                paused_for_corner=debug.get("paused_for_corner", False),
+                corner_stop_remaining_s=debug.get("corner_stop_remaining_s", 0.0),
+                edge_override_active=edge_correction.edge_override_active,
+                edge_detail=edge_correction.detail,
+                telemetry={
+                    "front_motor_temp_c": sensor_snapshot.telemetry.front_motor_temp_c,
+                    "back_motor_temp_c": sensor_snapshot.telemetry.back_motor_temp_c,
+                    "battery_voltage": sensor_snapshot.telemetry.battery_voltage,
+                },
+            )
             connection.send_motor_command(command)
             last_command = command
 
             if debug["finished"]:
                 print("  path complete: goal tolerance reached")
+                path_completed = True
+                emit_status(
+                    status_callback,
+                    running=False,
+                    mode=mode,
+                    status="complete",
+                    detail="goal tolerance reached",
+                    pose={
+                        "x": odom.pose.x,
+                        "y": odom.pose.y,
+                        "heading_deg": odom.pose.heading_deg,
+                    },
+                    step=step,
+                    max_steps=SIM_MAX_STEPS_PER_RUN,
+                    waypoint_index=debug["current_index"],
+                    remaining_distance=debug["remaining_distance"],
+                    velocity_in_per_s=0.0,
+                    motor_rpm_estimate=0.0,
+                    velocity_source="encoder",
+                )
                 break
 
         print(
@@ -186,7 +296,33 @@ def run_path(
         )
     finally:
         connection.stop()
-        print(f"Connection status: {connection.status()}")
+        final_connection_status = connection.status()
+        print(f"Connection status: {final_connection_status}")
+        final_status = "idle"
+        final_detail = f"connection closed: {final_connection_status.detail}"
+        if path_completed:
+            final_status = "complete"
+            final_detail = "run finished and connection closed"
+        elif last_command is not None:
+            final_status = "stopped"
+            final_detail = "run stopped before reaching the goal"
+        emit_status(
+            status_callback,
+            running=False,
+            mode=mode,
+            status=final_status,
+            detail=final_detail,
+            connection=final_connection_status.mode,
+            connection_connected=final_connection_status.connected,
+            pose={
+                "x": odom.pose.x,
+                "y": odom.pose.y,
+                "heading_deg": odom.pose.heading_deg,
+            },
+            velocity_in_per_s=0.0,
+            motor_rpm_estimate=0.0,
+            velocity_source="encoder",
+        )
         connection.close()
         camera.stop()
 

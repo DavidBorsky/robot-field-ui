@@ -1,0 +1,269 @@
+from __future__ import annotations
+
+import argparse
+import json
+import threading
+from dataclasses import dataclass, field
+from datetime import datetime, timezone
+from http import HTTPStatus
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from pathlib import Path
+from typing import Any
+
+from constants import DEFAULT_POWER_SCALE, DEFAULT_SERIAL_PORT_LINUX
+from robot_runner import BASE_DIR, run_path
+
+
+def utc_timestamp() -> str:
+    return datetime.now(timezone.utc).isoformat()
+
+
+@dataclass
+class RobotStateStore:
+    snapshot: dict[str, Any] = field(
+        default_factory=lambda: {
+            "connected": False,
+            "running": False,
+            "mode": "auton",
+            "status": "idle",
+            "detail": "server ready",
+            "connection": "serial",
+            "pose": {"x": 0.0, "y": 0.0, "heading_deg": 0.0},
+            "telemetry": {
+                "front_motor_temp_c": None,
+                "back_motor_temp_c": None,
+                "battery_voltage": None,
+            },
+            "velocity_in_per_s": 0.0,
+            "motor_rpm_estimate": 0.0,
+            "velocity_source": "model",
+            "step": 0,
+            "max_steps": 0,
+            "updated_at": utc_timestamp(),
+        }
+    )
+
+    def __post_init__(self) -> None:
+        self._lock = threading.Lock()
+        self._run_thread: threading.Thread | None = None
+
+    def get(self) -> dict[str, Any]:
+        with self._lock:
+            return json.loads(json.dumps(self.snapshot))
+
+    def update(self, **updates: Any) -> None:
+        with self._lock:
+            for key, value in updates.items():
+                if key == "pose" and isinstance(value, dict):
+                    self.snapshot["pose"] = {**self.snapshot.get("pose", {}), **value}
+                else:
+                    self.snapshot[key] = value
+            self.snapshot["updated_at"] = utc_timestamp()
+
+    def is_running(self) -> bool:
+        with self._lock:
+            return bool(self.snapshot.get("running"))
+
+    def set_thread(self, thread: threading.Thread | None) -> None:
+        with self._lock:
+            self._run_thread = thread
+
+
+def build_handler(
+    state_store: RobotStateStore,
+    default_path_file: Path,
+    default_serial_port: str,
+    default_baud: int,
+) -> type[BaseHTTPRequestHandler]:
+    class RobotRequestHandler(BaseHTTPRequestHandler):
+        server_version = "WaypointRobotServer/0.1"
+
+        def _send_json(self, payload: dict[str, Any], status: int = HTTPStatus.OK) -> None:
+            raw = json.dumps(payload).encode("utf-8")
+            self.send_response(status)
+            self.send_header("Content-Type", "application/json; charset=utf-8")
+            self.send_header("Content-Length", str(len(raw)))
+            self.send_header("Access-Control-Allow-Origin", "*")
+            self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+            self.send_header("Access-Control-Allow-Headers", "Content-Type")
+            self.end_headers()
+            self.wfile.write(raw)
+
+        def _read_json_body(self) -> dict[str, Any]:
+            content_length = int(self.headers.get("Content-Length", "0"))
+            if content_length <= 0:
+                return {}
+            payload = self.rfile.read(content_length)
+            if not payload:
+                return {}
+            return json.loads(payload.decode("utf-8"))
+
+        def do_OPTIONS(self) -> None:  # noqa: N802
+            self._send_json({"ok": True})
+
+        def do_GET(self) -> None:  # noqa: N802
+            if self.path == "/health":
+                self._send_json({"ok": True, "status": "ready"})
+                return
+            if self.path == "/robot-state":
+                snapshot = state_store.get()
+                snapshot["connected"] = True
+                self._send_json(snapshot)
+                return
+            self._send_json({"error": "not found"}, status=HTTPStatus.NOT_FOUND)
+
+        def do_POST(self) -> None:  # noqa: N802
+            if self.path == "/reset":
+                if state_store.is_running():
+                    self._send_json(
+                        {"error": "cannot reset while robot is running"},
+                        status=HTTPStatus.CONFLICT,
+                    )
+                    return
+
+                try:
+                    payload = self._read_json_body()
+                except json.JSONDecodeError:
+                    self._send_json({"error": "invalid JSON body"}, status=HTTPStatus.BAD_REQUEST)
+                    return
+
+                reset_pose = payload.get("pose") or {}
+                pose = {
+                    "x": float(reset_pose.get("x", 0.0)),
+                    "y": float(reset_pose.get("y", 0.0)),
+                    "heading_deg": float(reset_pose.get("heading_deg", 0.0)),
+                }
+                mode = payload.get("mode", state_store.get().get("mode", "auton"))
+                state_store.update(
+                    running=False,
+                    mode=mode,
+                    status="idle",
+                    detail="pose reset from UI",
+                    pose=pose,
+                    velocity_in_per_s=0.0,
+                    motor_rpm_estimate=0.0,
+                    velocity_source="encoder",
+                    step=0,
+                    max_steps=0,
+                )
+                self._send_json({"ok": True, "status": "reset", "pose": pose})
+                return
+
+            if self.path != "/run":
+                self._send_json({"error": "not found"}, status=HTTPStatus.NOT_FOUND)
+                return
+
+            if state_store.is_running():
+                self._send_json(
+                    {"error": "robot is already running"},
+                    status=HTTPStatus.CONFLICT,
+                )
+                return
+
+            try:
+                payload = self._read_json_body()
+            except json.JSONDecodeError:
+                self._send_json({"error": "invalid JSON body"}, status=HTTPStatus.BAD_REQUEST)
+                return
+
+            mode = payload.get("mode", "auton")
+            connection = payload.get("connection", "serial")
+            follower = payload.get("follower", "pure_pursuit")
+            path_file = Path(payload.get("path_file") or default_path_file)
+            serial_port = payload.get("port", default_serial_port)
+            serial_baud = int(payload.get("baud", default_baud))
+            power_scale = float(payload.get("power_scale", DEFAULT_POWER_SCALE))
+            robot_paths = payload.get("robot_paths")
+
+            if robot_paths is not None:
+                path_file.parent.mkdir(parents=True, exist_ok=True)
+                path_file.write_text(json.dumps(robot_paths, indent=2) + "\n", encoding="utf-8")
+
+            state_store.update(
+                running=True,
+                mode=mode,
+                connection=connection,
+                status="starting",
+                detail=f"launching {mode} run",
+                path_file=str(path_file),
+                power_scale=power_scale,
+            )
+
+            def publish(update: dict[str, Any]) -> None:
+                state_store.update(**update)
+
+            def worker() -> None:
+                try:
+                    run_path(
+                        mode=mode,
+                        path_file=path_file,
+                        simulate_connection=(connection == "simulated"),
+                        follower_controller=follower,
+                        serial_port=serial_port,
+                        serial_baud=serial_baud,
+                        power_scale=power_scale,
+                        status_callback=publish,
+                    )
+                    final_state = state_store.get()
+                    if final_state.get("status") not in {"complete", "stopped"}:
+                        state_store.update(status="complete", detail="run finished")
+                except Exception as exc:  # pragma: no cover - surfaced over API
+                    state_store.update(
+                        status="error",
+                        detail=str(exc),
+                    )
+                finally:
+                    state_store.update(running=False)
+                    state_store.set_thread(None)
+
+            thread = threading.Thread(target=worker, name="robot-runner", daemon=True)
+            state_store.set_thread(thread)
+            thread.start()
+
+            self._send_json(
+                {
+                    "ok": True,
+                    "status": "starting",
+                    "mode": mode,
+                    "connection": connection,
+                },
+                status=HTTPStatus.ACCEPTED,
+            )
+
+        def log_message(self, format: str, *args: Any) -> None:
+            return
+
+    return RobotRequestHandler
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(description="Serve live robot state to the field UI.")
+    parser.add_argument("--host", default="0.0.0.0", help="Host interface to bind")
+    parser.add_argument("--port", type=int, default=8765, help="HTTP port to bind")
+    parser.add_argument(
+        "--path-file",
+        default=str(BASE_DIR / "robot-paths.json"),
+        help="Path to robot-paths.json on the Pi",
+    )
+    parser.add_argument(
+        "--serial-port",
+        default=DEFAULT_SERIAL_PORT_LINUX,
+        help="Default serial port for the Arduino bridge",
+    )
+    parser.add_argument("--baud", type=int, default=115200, help="Default serial baud rate")
+    args = parser.parse_args()
+
+    state_store = RobotStateStore()
+    handler = build_handler(
+        state_store=state_store,
+        default_path_file=Path(args.path_file),
+        default_serial_port=args.serial_port,
+        default_baud=args.baud,
+    )
+    server = ThreadingHTTPServer((args.host, args.port), handler)
+    print(f"Robot server listening on http://{args.host}:{args.port}")
+    server.serve_forever()
+
+
+if __name__ == "__main__":
+    main()

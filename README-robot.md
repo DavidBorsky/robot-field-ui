@@ -9,9 +9,14 @@ The browser UI plans paths, and `robot-paths.json` is the shared format that bot
 - `robot-paths.json`
   Shared path file written by the UI and read by Python.
 
-- `robot-runner.py`
+- `robot_runner.py`
   High-level autonomous entry point on the Raspberry Pi.
   It loads the shared path data, picks `auton` or `teleop`, and coordinates the rest of the robot stack.
+
+- `robot_server.py`
+  Lightweight Pi-side HTTP API for the browser UI.
+  It exposes live robot state for field tracking and accepts remote `Run`
+  requests so the laptop UI can start `auton` or `teleop`.
 
 - `pid.py`
   Reusable PID controller code for distance, heading, and alignment loops.
@@ -82,6 +87,7 @@ The browser UI plans paths, and `robot-paths.json` is the shared format that bot
 - motor model: Tsiny geared motor
 - motor nominal voltage: 12V DC
 - motor free speed: 300 RPM
+- motor encoders: quadrature A/B +5V/GND leads are present
 - wheel diameter: 2.0 in
 - wheel width: 1.0 in
 - outer front/back spacing: about 4.5 in
@@ -102,12 +108,30 @@ theoretical wheel-edge speed of about 31.4 in/s before real-world load losses.
 1. Build a path in the UI.
 2. Save/export the shared JSON structure.
 3. Put that payload into `robot-paths.json`.
-4. Run `robot-runner.py` on the Raspberry Pi.
-5. `robot-runner.py` loads the chosen path and uses PID, odometry, drivetrain, gyro, camera, and connection code to follow it.
+4. Start `robot_server.py` on the Raspberry Pi.
+5. The browser UI connects to the Pi server, pushes the current path, and sends a run request.
+6. `robot_runner.py` loads the chosen path and uses PID, odometry, drivetrain, gyro, camera, and connection code to follow it.
 
-In simulated mode, `robot-runner.py` now also advances a virtual pose from the
+In simulated mode, `robot_runner.py` now also advances a virtual pose from the
 generated motor commands. That gives a much more useful pre-hardware test loop
 than repeatedly commanding the same stationary pose.
+
+During a run, the server publishes live pose updates so the field UI can show
+the robot marker moving in real time.
+
+## Encoder note
+
+The Python and Arduino code now assume front/back encoder telemetry will be sent
+back to the Pi. One constant still needs the exact motor datasheet value before
+the math is truly final:
+
+- `ENCODER_COUNTS_PER_OUTPUT_REV` in `constants.py`
+
+It is currently set to `360.0` as a placeholder until the exact counts-per-rev
+for the Tsiny motor encoder is confirmed. That value also needs to match the
+actual counting mode used in the Uno sketch. Right now the sketch counts changes
+on encoder channel `A` and reads channel `B` for direction, so the real number
+must match that measurement method.
 
 ## Current Arduino protocol
 
@@ -126,6 +150,12 @@ M,0.5000,-0.2000
 The Arduino Uno sketch stores those values, clamps them to `[-1.0, 1.0]`, and
 is ready to map them onto the real front/back motor driver pins once the wiring
 is finalized.
+
+The Uno sketch is also now structured to report sensor packets like:
+
+```text
+S,<left_edge>,<right_edge>,<heading_deg>,<front_count>,<back_count>,<front_rpm>,<back_rpm>,<front_temp_c>,<back_temp_c>,<battery_voltage>
+```
 
 ## Edge safety behavior
 

@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Robot Field</title>
+<title>Waypoint Field Console</title>
 
 <style>
   body {
@@ -24,11 +24,11 @@
 
   .rightPanel {
     width: 420px;
-    min-height: 600px;
+    min-height: 760px;
     border: 2px solid rgba(0,0,0,0.2);
     border-radius: 16px;
     background: rgba(0,0,0,0.04);
-    padding: 14px;
+    padding: 14px 14px 24px;
     box-sizing: border-box;
   }
 
@@ -111,6 +111,15 @@
     pointer-events: none;
   }
 
+  .robotTrail {
+    fill: none;
+    stroke: rgba(220, 32, 32, 0.32);
+    stroke-width: 10;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    display: none;
+  }
+
   .pt {
     position: absolute;
     width: 20px;
@@ -128,6 +137,53 @@
   .pt.start { background: rgb(30, 200, 60); }
   .pt.end   { background: rgb(230, 50, 50); }
   .pt.selected { box-shadow: 0 0 0 3px rgba(0,0,0,0.65); }
+
+  .robotMarker {
+    position: absolute;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    border: 3px solid #111;
+    background: #ffd400;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 20;
+    pointer-events: none;
+    display: none;
+    box-sizing: border-box;
+    box-shadow: 0 0 0 3px rgba(255, 212, 0, 0.22), 0 6px 14px rgba(0,0,0,0.24);
+    transition: box-shadow 0.18s ease, background 0.18s ease;
+  }
+
+  .robotMarker::before {
+    content: "";
+    position: absolute;
+    inset: -9px;
+    border-radius: 50%;
+    border: 2px solid rgba(255, 212, 0, 0.5);
+    opacity: 0;
+    transform: scale(0.8);
+  }
+
+  .robotMarker.moving {
+    box-shadow: 0 0 0 5px rgba(255, 212, 0, 0.24), 0 8px 16px rgba(0,0,0,0.28);
+  }
+
+  .robotMarker.moving::before {
+    animation: robotPulse 1s ease-out infinite;
+  }
+
+  @keyframes robotPulse {
+    0% {
+      opacity: 0.8;
+      transform: scale(0.72);
+    }
+    100% {
+      opacity: 0;
+      transform: scale(1.35);
+    }
+  }
 
   .label {
     position: absolute;
@@ -155,7 +211,7 @@
 
   button { margin-right: 8px; margin-top: 8px; }
 
-  .hint { color: #444; margin: 8px 0 12px; }
+  .hint { color: #444; margin: 14px 0 0; line-height: 1.45; }
 
   .row {
     display: flex;
@@ -261,8 +317,45 @@
     padding: 4px 0;
   }
 
+  .robotApiControls {
+    margin-top: 14px;
+    display: grid;
+    gap: 10px;
+  }
+
+  .robotApiControls input,
+  .robotApiControls select {
+    width: 100%;
+    padding: 9px 10px;
+    border: 1px solid rgba(0,0,0,0.2);
+    border-radius: 10px;
+    font-size: 13px;
+    box-sizing: border-box;
+  }
+
+  .robotApiRow {
+    display: flex;
+    gap: 8px;
+  }
+
+  .robotApiRow button {
+    margin: 0;
+  }
+
+  .robotStatus {
+    margin-top: 12px;
+    padding: 10px 12px;
+    border-radius: 10px;
+    background: rgba(0,0,0,0.05);
+    font-size: 13px;
+    line-height: 1.4;
+    color: #222;
+  }
+
   .runSection {
     margin-top: 14px;
+    display: grid;
+    gap: 10px;
   }
 
   .runBtn {
@@ -276,6 +369,45 @@
     font-weight: 700;
     cursor: pointer;
     margin: 0;
+  }
+
+  .resetBtn {
+    width: 100%;
+    padding: 11px 16px;
+    border: 1px solid rgba(0,0,0,0.2);
+    border-radius: 12px;
+    background: rgba(255,255,255,0.8);
+    color: #111;
+    font-size: 15px;
+    font-weight: 700;
+    cursor: pointer;
+    margin: 0;
+  }
+
+  .resetBtn:hover {
+    background: rgba(255,255,255,0.96);
+  }
+
+  .telemetryPanel {
+    margin-top: 14px;
+    padding: 12px 14px;
+    border: 1px solid rgba(0,0,0,0.12);
+    border-radius: 12px;
+    background: rgba(255,255,255,0.72);
+  }
+
+  .telemetryTitle {
+    font-size: 15px;
+    font-weight: 700;
+    margin-bottom: 8px;
+  }
+
+  .telemetryRow {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 14px;
+    padding: 4px 0;
   }
 
   .runBtn:hover {
@@ -300,7 +432,7 @@
 <div class="mainLayout">
   <div class="leftPanel">
     <div class="topBar">
-      <h2>Robot Field (96" x 60")</h2>
+      <h2>Waypoint Field Console</h2>
 
       <div class="modeToggle" id="controlModeToggle" aria-label="Control mode toggle">
         <button id="autonBtn" class="modeBtn active" type="button">Auton</button>
@@ -308,27 +440,14 @@
       </div>
     </div>
 
-    <div class="hint" id="hint">
-      <b>Controls:</b>
-      Drag a dot to move it. <b>Shift + click a dot</b> to delete.
-      <b>Shift + drag the curve</b> to “grab” and reshape it.
-      Press <b>Enter</b> to toggle View Mode (locks everything). In View Mode, click the field to continue editing.
-      Coordinates are in <b>inches</b>. (0,0) is bottom-left.
-    </div>
-
     <div id="wrap">
       <div id="field" tabindex="0" aria-label="Robot field editor">
         <div id="grid"></div>
         <svg id="lines" width="960" height="600"></svg>
+        <div id="robotMarker" class="robotMarker" aria-hidden="true"></div>
       </div>
 
       <div class="row">
-        <div class="inline">
-          <label for="tension">Curve tightness</label>
-          <input id="tension" type="range" min="0.2" max="1.2" step="0.05" value="0.85" />
-          <span id="tensionVal" class="pill">0.85</span>
-        </div>
-
         <div class="inline">
           <label class="inline">
             <input id="snapOn" type="checkbox" />
@@ -344,6 +463,7 @@
         </div>
 
         <div class="pill">Path length: <b><span id="pathLen">0.0</span>"</b></div>
+        <div class="pill">Est. time: <b><span id="courseTime">0.0</span>s</b></div>
 
         <div class="inline">
           <label class="inline">
@@ -386,6 +506,12 @@
         <div><b>Mode:</b> <span id="modeLabel">Edit | auton</span> <span id="modeHint" class="small"></span></div>
         <div><b>Cursor:</b> <span id="cursorLabel">(—, —)</span></div>
       </div>
+
+      <div class="hint" id="hint">
+        <b>Controls:</b>
+        Drag a dot to move it. <b>Shift + click a dot</b> to delete.
+        Press <b>Enter</b> to toggle View Mode. Coordinates are in <b>inches</b>, with (0,0) at the bottom-left.
+      </div>
     </div>
   </div>
 
@@ -400,11 +526,33 @@
       <div class="cameraCoordsTitle">Robot Coordinates</div>
       <div class="cameraCoordsRow"><span>X:</span> <span id="robotX">0.00</span></div>
       <div class="cameraCoordsRow"><span>Y:</span> <span id="robotY">0.00</span></div>
-      <div class="cameraCoordsRow"><span>Heading:</span> <span id="robotHeading">0.00°</span></div>
+      <div class="cameraCoordsRow"><span>Velocity:</span> <span id="robotVelocity">0.00 in/s</span></div>
+      <div class="cameraCoordsRow"><span>Motor RPM:</span> <span id="robotMotorRpm">0.0</span></div>
     </div>
+
+    <div id="robotStatus" class="robotStatus">Robot API not connected yet.</div>
 
     <div class="runSection">
       <button id="runBtn" class="runBtn" type="button">Run</button>
+      <button id="resetBtn" class="resetBtn" type="button">Reset Pose</button>
+    </div>
+
+    <div class="telemetryPanel">
+      <div class="telemetryTitle">Robot Telemetry</div>
+      <div class="telemetryRow"><span>Front Motor Temp:</span> <span id="frontMotorTemp">--</span></div>
+      <div class="telemetryRow"><span>Back Motor Temp:</span> <span id="backMotorTemp">--</span></div>
+      <div class="telemetryRow"><span>Battery Voltage:</span> <span id="batteryVoltage">--</span></div>
+    </div>
+
+    <div class="robotApiControls">
+      <input id="robotApiUrl" type="text" value="http://raspberrypi.local:8765" placeholder="Robot API URL">
+      <div class="robotApiRow">
+        <select id="robotConnectionMode">
+          <option value="serial" selected>Arduino serial</option>
+          <option value="simulated">Simulated</option>
+        </select>
+        <button id="connectRobotBtn" type="button">Connect</button>
+      </div>
     </div>
 
     <div class="cameraHint">
@@ -425,6 +573,16 @@ const DRAG_THRESHOLD_PX = 5;
 const SAMPLES_PER_SEG = 30;
 const ARROW_EVERY_N = 18;
 const ARROW_LEN_PX = 14;
+const LOCAL_SIM_MAX_SPEED_IN_PER_S = 9;
+const LOCAL_SIM_MIN_SPEED_IN_PER_S = 2;
+const LOCAL_SIM_LONG_RUN_DISTANCE_IN = 24;
+const LOCAL_SIM_SLOWDOWN_DISTANCE_IN = 18;
+const LOCAL_SIM_CORNER_WINDOW_IN = 10;
+const LOCAL_SIM_CORNER_SLOWDOWN_GAIN = 1.2;
+const LOCAL_SIM_CORNER_STOP_DURATION_S = 0.5;
+const LOCAL_SIM_STOP_BRAKE_DISTANCE_IN = 16;
+const LOCAL_SIM_ACCEL_IN_PER_S2 = 6;
+const LOCAL_SIM_DECEL_IN_PER_S2 = 10;
 
 const field = document.getElementById("field");
 const grid = document.getElementById("grid");
@@ -434,11 +592,10 @@ const out = document.getElementById("out");
 const autonBtn = document.getElementById("autonBtn");
 const teleopBtn = document.getElementById("teleopBtn");
 
-const tensionSlider = document.getElementById("tension");
-const tensionVal = document.getElementById("tensionVal");
 const snapOn = document.getElementById("snapOn");
 const snapStep = document.getElementById("snapStep");
 const pathLenEl = document.getElementById("pathLen");
+const courseTimeEl = document.getElementById("courseTime");
 const showArrows = document.getElementById("showArrows");
 const showGrid = document.getElementById("showGrid");
 
@@ -454,8 +611,18 @@ const cursorLabel = document.getElementById("cursorLabel");
 
 const robotX = document.getElementById("robotX");
 const robotY = document.getElementById("robotY");
-const robotHeading = document.getElementById("robotHeading");
+const robotVelocity = document.getElementById("robotVelocity");
+const robotMotorRpm = document.getElementById("robotMotorRpm");
+const robotMarker = document.getElementById("robotMarker");
+const robotApiUrlInput = document.getElementById("robotApiUrl");
+const robotConnectionMode = document.getElementById("robotConnectionMode");
+const connectRobotBtn = document.getElementById("connectRobotBtn");
+const robotStatus = document.getElementById("robotStatus");
 const runBtn = document.getElementById("runBtn");
+const resetBtn = document.getElementById("resetBtn");
+const frontMotorTemp = document.getElementById("frontMotorTemp");
+const backMotorTemp = document.getElementById("backMotorTemp");
+const batteryVoltage = document.getElementById("batteryVoltage");
 
 let controlMode = "auton";
 
@@ -499,6 +666,28 @@ let robotPathsFileHandle = null;
 let syncTimer = null;
 let syncWriteInFlight = false;
 let syncQueuedAfterWrite = false;
+let robotApiBaseUrl = robotApiUrlInput.value.trim();
+let robotPollTimer = null;
+let robotPollInFlight = false;
+let robotApiConnected = false;
+let robotMoving = false;
+let robotVelocityInPerS = 0;
+let robotMotorRpmEstimate = 0;
+let lastVelocityPose = null;
+let lastVelocityTimestampMs = null;
+let robotTrailPoints = [];
+let localSimulation = {
+  active: false,
+  frameId: null,
+  samples: [],
+  totalDistance: 0,
+  currentSpeed: 0,
+  distanceTravelled: 0,
+  lastTimestamp: null,
+  cornerStopDistances: [],
+  completedCornerStops: new Set(),
+  pauseRemainingS: 0
+};
 
 /* =======================
    Helpers
@@ -538,6 +727,10 @@ function distPx(a, b) {
   return Math.hypot(a.x - b.x, a.y - b.y);
 }
 
+function distIn(a, b) {
+  return Math.hypot(a.x - b.x, a.y - b.y);
+}
+
 function formatPoint(p) {
   return [Number(p.x.toFixed(2)), Number(p.y.toFixed(2))];
 }
@@ -559,6 +752,32 @@ function buildRobotPathsPayload() {
 function setSyncStatus(message, isError = false) {
   syncStatus.textContent = message;
   syncStatus.style.color = isError ? "#a11" : "#333";
+}
+
+function setRobotStatus(message, isError = false) {
+  robotStatus.textContent = message;
+  robotStatus.style.color = isError ? "#a11" : "#222";
+}
+
+function formatTelemetryValue(value, suffix = "") {
+  if (value == null || Number.isNaN(Number(value))) return "--";
+  return `${Number(value).toFixed(1)}${suffix}`;
+}
+
+function formatSeconds(seconds) {
+  if (!Number.isFinite(seconds) || seconds <= 0) return "0.0";
+  if (seconds < 60) return seconds.toFixed(1);
+  const mins = Math.floor(seconds / 60);
+  const secs = seconds - mins * 60;
+  return `${mins}:${secs.toFixed(1).padStart(4, "0")}`;
+}
+
+function formatVelocity(value) {
+  return `${value.toFixed(2)} in/s`;
+}
+
+function formatRpm(value) {
+  return `${value.toFixed(1)}`;
 }
 
 async function writeRobotPathsFileNow() {
@@ -664,16 +883,10 @@ function loadRobotPathsPayload(payload) {
     controlMode = payload.ui.controlMode;
   }
 
-  if (payload.ui?.tension != null) {
-    tensionSlider.value = String(payload.ui.tension);
-  }
-
   if (payload.ui?.snap) {
     snapOn.checked = !!payload.ui.snap.on;
     snapStep.value = String(payload.ui.snap.step ?? snapStep.value);
   }
-
-  tensionVal.textContent = Number(tensionSlider.value).toFixed(2);
   autonBtn.classList.toggle("active", controlMode === "auton");
   teleopBtn.classList.toggle("active", controlMode === "teleop");
 }
@@ -701,10 +914,168 @@ teleopBtn.addEventListener("click", () => setControlMode("teleop"));
 function updateRobotCoords() {
   robotX.textContent = robotPose.x.toFixed(2);
   robotY.textContent = robotPose.y.toFixed(2);
-  robotHeading.textContent = robotPose.heading.toFixed(2) + "°";
+  robotVelocity.textContent = formatVelocity(robotVelocityInPerS);
+  robotMotorRpm.textContent = formatRpm(robotMotorRpmEstimate);
 }
 
-runBtn.addEventListener("click", () => {
+function updateTelemetry(telemetry = {}) {
+  frontMotorTemp.textContent = formatTelemetryValue(telemetry.front_motor_temp_c, " C");
+  backMotorTemp.textContent = formatTelemetryValue(telemetry.back_motor_temp_c, " C");
+  batteryVoltage.textContent = formatTelemetryValue(telemetry.battery_voltage, " V");
+}
+
+function clearRobotTrail() {
+  robotTrailPoints = [];
+  robotTrailPath.setAttribute("d", "");
+  robotTrailPath.style.display = "none";
+}
+
+function appendRobotTrailPoint(point) {
+  const last = robotTrailPoints[robotTrailPoints.length - 1];
+  if (last && distIn(last, point) < 0.2) return;
+
+  robotTrailPoints.push({ x: point.x, y: point.y });
+  if (robotTrailPoints.length > 180) {
+    robotTrailPoints.shift();
+  }
+
+  if (robotTrailPoints.length < 2) {
+    robotTrailPath.setAttribute("d", "");
+    robotTrailPath.style.display = "none";
+    return;
+  }
+
+  const pathD = robotTrailPoints.map((trailPoint, index) => {
+    const px = toPx(trailPoint);
+    return `${index === 0 ? "M" : "L"} ${px.x} ${px.y}`;
+  }).join(" ");
+  robotTrailPath.setAttribute("d", pathD);
+  robotTrailPath.style.display = "";
+}
+
+function updateRobotMarker() {
+  const clampedPose = {
+    x: clamp(robotPose.x, 0, FIELD_W_IN),
+    y: clamp(robotPose.y, 0, FIELD_H_IN)
+  };
+  positionDot(robotMarker, clampedPose);
+  const shouldShowMarker =
+    robotApiConnected
+    || localSimulation.active
+    || getPts().length > 0;
+  robotMarker.style.display = shouldShowMarker ? "flex" : "none";
+  robotMarker.classList.toggle("moving", robotMoving);
+  robotMarker.style.transform = "translate(-12px, -12px)";
+}
+
+function updateVelocityFromPose(nowMs = performance.now()) {
+  if (lastVelocityPose == null || lastVelocityTimestampMs == null) {
+    lastVelocityPose = { x: robotPose.x, y: robotPose.y };
+    lastVelocityTimestampMs = nowMs;
+    robotVelocityInPerS = 0;
+    return;
+  }
+
+  const dt = Math.max((nowMs - lastVelocityTimestampMs) / 1000, 1e-6);
+  const dx = robotPose.x - lastVelocityPose.x;
+  const dy = robotPose.y - lastVelocityPose.y;
+  robotVelocityInPerS = Math.hypot(dx, dy) / dt;
+  lastVelocityPose = { x: robotPose.x, y: robotPose.y };
+  lastVelocityTimestampMs = nowMs;
+}
+
+function setRobotVelocityFromModel(valueInPerS, nowMs = performance.now()) {
+  robotVelocityInPerS = Math.max(0, Number(valueInPerS) || 0);
+  lastVelocityPose = { x: robotPose.x, y: robotPose.y };
+  lastVelocityTimestampMs = nowMs;
+}
+
+function setRobotMotorRpm(value) {
+  robotMotorRpmEstimate = Math.max(0, Number(value) || 0);
+}
+
+function stopRobotPolling() {
+  if (robotPollTimer) clearInterval(robotPollTimer);
+  robotPollTimer = null;
+}
+
+async function pollRobotState() {
+  if (!robotApiBaseUrl || robotPollInFlight) return;
+  robotPollInFlight = true;
+
+  try {
+    const response = await fetch(`${robotApiBaseUrl}/robot-state`, { cache: "no-store" });
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`);
+    }
+
+    const payload = await response.json();
+    robotApiConnected = true;
+    if (payload.pose) {
+      robotPose.x = Number(payload.pose.x ?? robotPose.x) || 0;
+      robotPose.y = Number(payload.pose.y ?? robotPose.y) || 0;
+      robotPose.heading = Number(payload.pose.heading_deg ?? robotPose.heading) || 0;
+    }
+    robotMoving = !!payload.running;
+    if (payload.velocity_in_per_s != null) {
+      setRobotVelocityFromModel(payload.velocity_in_per_s);
+    } else {
+      updateVelocityFromPose();
+    }
+    setRobotMotorRpm(payload.motor_rpm_estimate);
+    if (robotMoving) {
+      appendRobotTrailPoint({ x: robotPose.x, y: robotPose.y });
+    }
+
+    updateRobotCoords();
+    updateRobotMarker();
+    updateTelemetry(payload.telemetry || {});
+
+    const statusText = [
+      `Status: ${payload.status ?? "unknown"}`,
+      payload.running ? "running" : "not running",
+      payload.detail ? `| ${payload.detail}` : "",
+      payload.remaining_distance != null ? `| remaining ${Number(payload.remaining_distance).toFixed(2)}"` : "",
+      `| velocity ${formatVelocity(robotVelocityInPerS)}`
+    ].join(" ");
+    setRobotStatus(statusText.trim());
+    runBtn.disabled = !!payload.running;
+    runBtn.textContent = payload.running ? "Running..." : "Run";
+    resetBtn.disabled = !!payload.running;
+  } catch (err) {
+    robotApiConnected = false;
+    robotMoving = false;
+    setRobotVelocityFromModel(0);
+    setRobotMotorRpm(0);
+    updateRobotMarker();
+    updateRobotCoords();
+    runBtn.disabled = false;
+    runBtn.textContent = "Run";
+    resetBtn.disabled = false;
+    setRobotStatus(`Robot API offline: ${err.message}`, true);
+  } finally {
+    robotPollInFlight = false;
+  }
+}
+
+function startRobotPolling() {
+  stopRobotPolling();
+  robotApiBaseUrl = robotApiUrlInput.value.trim().replace(/\/+$/, "");
+  if (!robotApiBaseUrl) {
+    setRobotStatus("Enter the Pi robot API URL first.", true);
+    return;
+  }
+
+  setRobotStatus("Connecting to robot API...");
+  pollRobotState();
+  robotPollTimer = setInterval(pollRobotState, 350);
+}
+
+connectRobotBtn.addEventListener("click", () => {
+  startRobotPolling();
+});
+
+runBtn.addEventListener("click", async () => {
   const pts = getPts();
 
   if (pts.length < 2) {
@@ -712,77 +1083,533 @@ runBtn.addEventListener("click", () => {
     return;
   }
 
-  console.log("Run pressed for mode:", controlMode);
-  console.log("Waypoints:", pts);
-  alert(`Run started for ${controlMode} with ${pts.length} waypoint(s).`);
+  if (robotConnectionMode.value === "simulated") {
+    startLocalSimulation();
+    return;
+  }
+
+  robotApiBaseUrl = robotApiUrlInput.value.trim().replace(/\/+$/, "");
+  if (!robotApiBaseUrl) {
+    alert("Enter the Pi robot API URL first.");
+    return;
+  }
+
+  runBtn.disabled = true;
+  runBtn.textContent = "Starting...";
+
+  try {
+    const response = await fetch(`${robotApiBaseUrl}/run`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        mode: controlMode,
+        connection: robotConnectionMode.value,
+        power_scale: 0.5,
+        robot_paths: buildRobotPathsPayload()
+      })
+    });
+
+    const payload = await response.json();
+    if (!response.ok) {
+      throw new Error(payload.error || `HTTP ${response.status}`);
+    }
+
+    setRobotStatus(`Run requested: ${controlMode} via ${robotConnectionMode.value}`);
+    startRobotPolling();
+  } catch (err) {
+    runBtn.disabled = false;
+    runBtn.textContent = "Run";
+    setRobotStatus(`Failed to start run: ${err.message}`, true);
+    alert(`Failed to start run: ${err.message}`);
+  }
+});
+
+resetBtn.addEventListener("click", async () => {
+  stopLocalSimulation({ preservePose: false });
+
+  if (robotConnectionMode.value === "simulated") {
+    const pts = getPts();
+    const start = pts[0] || { x: 0, y: 0 };
+    robotPose.x = start.x;
+    robotPose.y = start.y;
+    robotPose.heading = 0;
+    robotMoving = false;
+    setRobotVelocityFromModel(0);
+    setRobotMotorRpm(0);
+    lastVelocityPose = { x: robotPose.x, y: robotPose.y };
+    lastVelocityTimestampMs = performance.now();
+    clearRobotTrail();
+    appendRobotTrailPoint({ x: robotPose.x, y: robotPose.y });
+    updateRobotCoords();
+    updateRobotMarker();
+    setRobotStatus("Local simulated pose reset.");
+    return;
+  }
+
+  robotApiBaseUrl = robotApiUrlInput.value.trim().replace(/\/+$/, "");
+  if (!robotApiBaseUrl) {
+    alert("Enter the Pi robot API URL first.");
+    return;
+  }
+
+  const pts = getPts();
+  const start = pts[0] || { x: 0, y: 0 };
+
+  try {
+    const response = await fetch(`${robotApiBaseUrl}/reset`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        mode: controlMode,
+        pose: {
+          x: start.x,
+          y: start.y,
+          heading_deg: 0
+        }
+      })
+    });
+    const payload = await response.json();
+    if (!response.ok) {
+      throw new Error(payload.error || `HTTP ${response.status}`);
+    }
+
+    robotPose.x = Number(payload.pose?.x ?? start.x);
+    robotPose.y = Number(payload.pose?.y ?? start.y);
+    robotPose.heading = Number(payload.pose?.heading_deg ?? 0);
+    robotMoving = false;
+    setRobotVelocityFromModel(0);
+    setRobotMotorRpm(0);
+    lastVelocityPose = { x: robotPose.x, y: robotPose.y };
+    lastVelocityTimestampMs = performance.now();
+    clearRobotTrail();
+    appendRobotTrailPoint({ x: robotPose.x, y: robotPose.y });
+    updateRobotCoords();
+    updateRobotMarker();
+    setRobotStatus("Robot pose reset.");
+    startRobotPolling();
+  } catch (err) {
+    setRobotStatus(`Failed to reset pose: ${err.message}`, true);
+    alert(`Failed to reset pose: ${err.message}`);
+  }
 });
 
 /* =======================
-   Catmull-Rom -> cubic Bezier
+   Straight path helpers
 ======================= */
-function catmullRomPathD(pointsPx, tension = 0.85) {
+function polylinePathD(pointsPx) {
   if (pointsPx.length === 0) return "";
-  if (pointsPx.length === 1) return `M ${pointsPx[0].x} ${pointsPx[0].y}`;
-
-  const t = tension;
-  let d = `M ${pointsPx[0].x} ${pointsPx[0].y}`;
-
-  for (let i = 0; i < pointsPx.length - 1; i++) {
-    const p0 = pointsPx[i - 1] ?? pointsPx[i];
-    const p1 = pointsPx[i];
-    const p2 = pointsPx[i + 1];
-    const p3 = pointsPx[i + 2] ?? p2;
-
-    const c1 = {
-      x: p1.x + (p2.x - p0.x) * (t / 6),
-      y: p1.y + (p2.y - p0.y) * (t / 6),
-    };
-    const c2 = {
-      x: p2.x - (p3.x - p1.x) * (t / 6),
-      y: p2.y - (p3.y - p1.y) * (t / 6),
-    };
-
-    d += ` C ${c1.x} ${c1.y}, ${c2.x} ${c2.y}, ${p2.x} ${p2.y}`;
-  }
-
-  return d;
+  return pointsPx.map((point, index) => `${index === 0 ? "M" : "L"} ${point.x} ${point.y}`).join(" ");
 }
 
-function sampleSpline(pointsIn, samplesPerSeg = SAMPLES_PER_SEG) {
-  if (pointsIn.length < 2) return [];
-  const P = pointsIn.map(toPx);
-  const t = Number(tensionSlider.value);
+function buildDrivePathPoints(pointsIn) {
+  if (pointsIn.length === 0) return [];
+
+  const routed = [{ x: pointsIn[0].x, y: pointsIn[0].y }];
+  for (let i = 0; i < pointsIn.length - 1; i++) {
+    const start = pointsIn[i];
+    const end = pointsIn[i + 1];
+    const corner = { x: end.x, y: start.y };
+
+    if (corner.x !== start.x || corner.y !== start.y) {
+      routed.push(corner);
+    }
+    if (end.x !== corner.x || end.y !== corner.y) {
+      routed.push({ x: end.x, y: end.y });
+    }
+  }
+  return routed;
+}
+
+function sampleDrivePath(pointsIn, samplesPerSeg = SAMPLES_PER_SEG) {
+  const drivePoints = buildDrivePathPoints(pointsIn);
+  if (drivePoints.length < 2) return [];
 
   const outS = [];
-  for (let i = 0; i < P.length - 1; i++) {
-    const p0 = P[i - 1] ?? P[i];
-    const p1 = P[i];
-    const p2 = P[i + 1];
-    const p3 = P[i + 2] ?? p2;
-
-    const c1 = {
-      x: p1.x + (p2.x - p0.x) * (t / 6),
-      y: p1.y + (p2.y - p0.y) * (t / 6),
-    };
-    const c2 = {
-      x: p2.x - (p3.x - p1.x) * (t / 6),
-      y: p2.y - (p3.y - p1.y) * (t / 6),
-    };
-
+  for (let i = 0; i < drivePoints.length - 1; i++) {
+    const start = drivePoints[i];
+    const end = drivePoints[i + 1];
     for (let s = 0; s <= samplesPerSeg; s++) {
-      const u = s / samplesPerSeg;
-      const a = 1 - u;
-      const a2 = a * a, a3 = a2 * a;
-      const u2 = u * u, u3 = u2 * u;
-
-      const x = a3 * p1.x + 3 * a2 * u * c1.x + 3 * a * u2 * c2.x + u3 * p2.x;
-      const y = a3 * p1.y + 3 * a2 * u * c1.y + 3 * a * u2 * c2.y + u3 * p2.y;
-
-      const inPt = { x: x / PX_PER_IN, y: FIELD_H_IN - (y / PX_PER_IN) };
-      outS.push({ px: { x, y }, in: inPt, segIndex: i });
+      const t = s / samplesPerSeg;
+      const inPt = {
+        x: start.x + (end.x - start.x) * t,
+        y: start.y + (end.y - start.y) * t,
+      };
+      outS.push({
+        px: toPx(inPt),
+        in: inPt,
+        segIndex: i,
+      });
     }
   }
   return outS;
+}
+
+function decorateSamples(samples) {
+  if (samples.length === 0) return [];
+
+  let cumulative = 0;
+  return samples.map((sample, index) => {
+    const prev = samples[index - 1];
+    if (prev) {
+      cumulative += distIn(prev.in, sample.in);
+    }
+
+    let turnSeverity = 0;
+    const next = samples[index + 1];
+    if (prev && next) {
+      const ax = sample.in.x - prev.in.x;
+      const ay = sample.in.y - prev.in.y;
+      const bx = next.in.x - sample.in.x;
+      const by = next.in.y - sample.in.y;
+      const aMag = Math.hypot(ax, ay);
+      const bMag = Math.hypot(bx, by);
+      if (aMag > 1e-6 && bMag > 1e-6) {
+        const cosTheta = clamp((ax * bx + ay * by) / (aMag * bMag), -1, 1);
+        turnSeverity = Math.acos(cosTheta) / Math.PI;
+      }
+    }
+
+    return {
+      ...sample,
+      cumulativeDistance: cumulative,
+      turnSeverity
+    };
+  });
+}
+
+function computeDesiredSpeed(samples, index, currentDistance = null, completedStops = null) {
+  if (!samples.length) return LOCAL_SIM_MIN_SPEED_IN_PER_S;
+
+  const sample = samples[index];
+  const totalDistance = samples[samples.length - 1].cumulativeDistance;
+  const travelledDistance = currentDistance == null ? sample.cumulativeDistance : currentDistance;
+  const remainingDistance = Math.max(0, totalDistance - travelledDistance);
+  const longRunScale = clamp(totalDistance / LOCAL_SIM_LONG_RUN_DISTANCE_IN, 0.45, 1);
+  const stopDistances = extractCornerStopDistances(samples);
+  const nextStopDistance = distanceToNextStop(
+    travelledDistance,
+    totalDistance,
+    stopDistances,
+    completedStops ?? new Set()
+  );
+  const endScale = clamp(remainingDistance / LOCAL_SIM_SLOWDOWN_DISTANCE_IN, 0.18, 1);
+  const normalizedStopDistance = clamp(
+    nextStopDistance / LOCAL_SIM_STOP_BRAKE_DISTANCE_IN,
+    0,
+    1
+  );
+  const stopScale = clamp(normalizedStopDistance * normalizedStopDistance, 0.02, 1);
+
+  let cornerScale = 1;
+  for (let i = index; i < samples.length - 1; i += 1) {
+    const distanceAhead = samples[i].cumulativeDistance - sample.cumulativeDistance;
+    if (distanceAhead > LOCAL_SIM_CORNER_WINDOW_IN) break;
+    if (samples[i].turnSeverity > 0.08) {
+      const approachScale = clamp(distanceAhead / LOCAL_SIM_CORNER_WINDOW_IN, 0, 1);
+      const approachWeight = approachScale * approachScale;
+      const slowFloor = clamp(1 - LOCAL_SIM_CORNER_SLOWDOWN_GAIN * samples[i].turnSeverity, 0.12, 1);
+      cornerScale = Math.min(cornerScale, slowFloor + (1 - slowFloor) * approachWeight);
+    }
+  }
+
+  const speedScale = clamp(Math.min(longRunScale, endScale, stopScale, cornerScale), 0.08, 1);
+  return LOCAL_SIM_MIN_SPEED_IN_PER_S
+    + (LOCAL_SIM_MAX_SPEED_IN_PER_S - LOCAL_SIM_MIN_SPEED_IN_PER_S) * speedScale;
+}
+
+function rampLocalSpeed(currentSpeed, targetSpeed, dt) {
+  const rampRate = targetSpeed >= currentSpeed
+    ? LOCAL_SIM_ACCEL_IN_PER_S2
+    : LOCAL_SIM_DECEL_IN_PER_S2;
+  const maxDelta = rampRate * Math.max(dt, 1e-6);
+  return clamp(targetSpeed, currentSpeed - maxDelta, currentSpeed + maxDelta);
+}
+
+function estimateCourseTimeForPoints(points) {
+  const decorated = decorateSamples(sampleDrivePath(points, SAMPLES_PER_SEG));
+  if (decorated.length < 2) return 0;
+
+  const totalDistance = decorated[decorated.length - 1].cumulativeDistance;
+  const stopDistances = extractCornerStopDistances(decorated);
+  const completedStops = new Set();
+  const dt = 0.02;
+  let travelledDistance = 0;
+  let speed = 0;
+  let totalSeconds = 0;
+  let safetySteps = 0;
+
+  while (travelledDistance < totalDistance && safetySteps < 20000) {
+    safetySteps += 1;
+    let sampleIndex = 0;
+    while (
+      sampleIndex + 1 < decorated.length &&
+      decorated[sampleIndex + 1].cumulativeDistance < travelledDistance
+    ) {
+      sampleIndex += 1;
+    }
+
+    const targetSpeed = computeDesiredSpeed(decorated, sampleIndex, travelledDistance, completedStops);
+    speed = rampLocalSpeed(speed, targetSpeed, dt);
+    const nextDistance = Math.min(travelledDistance + speed * dt, totalDistance);
+
+    let stoppedAtCorner = false;
+    for (const stopDistance of stopDistances) {
+      if (completedStops.has(stopDistance)) continue;
+      if (stopDistance <= travelledDistance || stopDistance > nextDistance) continue;
+      travelledDistance = stopDistance;
+      completedStops.add(stopDistance);
+      speed = 0;
+      totalSeconds += LOCAL_SIM_CORNER_STOP_DURATION_S;
+      stoppedAtCorner = true;
+      break;
+    }
+
+    if (stoppedAtCorner) {
+      continue;
+    }
+
+    travelledDistance = nextDistance;
+    totalSeconds += dt;
+  }
+  return totalSeconds;
+}
+
+function updateCourseEstimate() {
+  courseTimeEl.textContent = formatSeconds(estimateCourseTimeForPoints(getPts()));
+}
+
+function extractCornerStopDistances(samples) {
+  const stopDistances = [];
+  for (let i = 1; i < samples.length; i += 1) {
+    if (samples[i].segIndex === samples[i - 1].segIndex) continue;
+    stopDistances.push(samples[i].cumulativeDistance);
+  }
+  return stopDistances;
+}
+
+function distanceToNextStop(distanceTravelled, totalDistance, stopDistances, completedStops) {
+  let best = totalDistance - distanceTravelled;
+  for (const stopDistance of stopDistances) {
+    if (completedStops.has(stopDistance)) continue;
+    if (stopDistance < distanceTravelled) continue;
+    best = Math.min(best, stopDistance - distanceTravelled);
+  }
+  return Math.max(0, best);
+}
+
+function interpolatePoseAtDistance(samples, distanceTravelled) {
+  if (!samples.length) {
+    return { x: 0, y: 0, heading: 0 };
+  }
+
+  if (distanceTravelled <= 0) {
+    return {
+      x: samples[0].in.x,
+      y: samples[0].in.y,
+      heading: 0
+    };
+  }
+
+  const last = samples[samples.length - 1];
+  if (distanceTravelled >= last.cumulativeDistance) {
+    return {
+      x: last.in.x,
+      y: last.in.y,
+      heading: 0
+    };
+  }
+
+  for (let i = 1; i < samples.length; i += 1) {
+    if (samples[i].cumulativeDistance < distanceTravelled) continue;
+    const prev = samples[i - 1];
+    const next = samples[i];
+    const span = Math.max(next.cumulativeDistance - prev.cumulativeDistance, 1e-6);
+    const t = clamp((distanceTravelled - prev.cumulativeDistance) / span, 0, 1);
+    return {
+      x: prev.in.x + (next.in.x - prev.in.x) * t,
+      y: prev.in.y + (next.in.y - prev.in.y) * t,
+      heading: 0
+    };
+  }
+
+  return {
+    x: last.in.x,
+    y: last.in.y,
+    heading: 0
+  };
+}
+
+function stopLocalSimulation({ preservePose = true } = {}) {
+  if (localSimulation.frameId != null) {
+    cancelAnimationFrame(localSimulation.frameId);
+  }
+  localSimulation.active = false;
+  localSimulation.frameId = null;
+  localSimulation.samples = [];
+  localSimulation.totalDistance = 0;
+  localSimulation.currentSpeed = 0;
+  localSimulation.distanceTravelled = 0;
+  localSimulation.lastTimestamp = null;
+  localSimulation.cornerStopDistances = [];
+  localSimulation.completedCornerStops = new Set();
+  localSimulation.pauseRemainingS = 0;
+  robotMoving = false;
+  setRobotVelocityFromModel(0);
+  setRobotMotorRpm(0);
+  lastVelocityPose = { x: robotPose.x, y: robotPose.y };
+  lastVelocityTimestampMs = performance.now();
+  if (!preservePose) {
+    clearRobotTrail();
+  }
+  runBtn.disabled = false;
+  runBtn.textContent = "Run";
+  resetBtn.disabled = false;
+  if (!preservePose) {
+    updateRobotMarker();
+  }
+}
+
+function runLocalSimulationFrame(timestamp) {
+  if (!localSimulation.active) return;
+
+  if (localSimulation.lastTimestamp == null) {
+    localSimulation.lastTimestamp = timestamp;
+  }
+
+  const dt = Math.min((timestamp - localSimulation.lastTimestamp) / 1000, 0.05);
+  localSimulation.lastTimestamp = timestamp;
+
+  if (localSimulation.pauseRemainingS > 0) {
+    localSimulation.pauseRemainingS = Math.max(0, localSimulation.pauseRemainingS - dt);
+    robotMoving = false;
+    localSimulation.currentSpeed = 0;
+    setRobotVelocityFromModel(0, timestamp);
+    setRobotMotorRpm(0);
+    updateRobotMarker();
+    updateRobotCoords();
+    const remaining = Math.max(0, localSimulation.totalDistance - localSimulation.distanceTravelled);
+    setRobotStatus(
+      `Local simulation running | remaining ${remaining.toFixed(1)}" | velocity ${formatVelocity(robotVelocityInPerS)}`
+    );
+    localSimulation.frameId = requestAnimationFrame(runLocalSimulationFrame);
+    return;
+  }
+
+  let sampleIndex = 0;
+  while (
+    sampleIndex + 1 < localSimulation.samples.length &&
+    localSimulation.samples[sampleIndex + 1].cumulativeDistance < localSimulation.distanceTravelled
+  ) {
+    sampleIndex += 1;
+  }
+
+  const targetSpeed = computeDesiredSpeed(
+    localSimulation.samples,
+    sampleIndex,
+    localSimulation.distanceTravelled,
+    localSimulation.completedCornerStops
+  );
+  const speed = rampLocalSpeed(localSimulation.currentSpeed, targetSpeed, dt);
+  localSimulation.currentSpeed = speed;
+  const nextDistance = Math.min(
+    localSimulation.distanceTravelled + speed * dt,
+    localSimulation.totalDistance
+  );
+
+  for (const stopDistance of localSimulation.cornerStopDistances) {
+    if (localSimulation.completedCornerStops.has(stopDistance)) continue;
+    if (stopDistance <= localSimulation.distanceTravelled || stopDistance > nextDistance) continue;
+    localSimulation.distanceTravelled = stopDistance;
+    localSimulation.completedCornerStops.add(stopDistance);
+    localSimulation.pauseRemainingS = LOCAL_SIM_CORNER_STOP_DURATION_S;
+    localSimulation.currentSpeed = 0;
+    const stopPose = interpolatePoseAtDistance(localSimulation.samples, localSimulation.distanceTravelled);
+    robotPose.x = stopPose.x;
+    robotPose.y = stopPose.y;
+    robotPose.heading = 0;
+    robotMoving = false;
+    setRobotVelocityFromModel(0, timestamp);
+    setRobotMotorRpm(0);
+    appendRobotTrailPoint({ x: robotPose.x, y: robotPose.y });
+    updateRobotCoords();
+    updateRobotMarker();
+    const remaining = Math.max(0, localSimulation.totalDistance - localSimulation.distanceTravelled);
+    setRobotStatus(
+      `Local simulation running | remaining ${remaining.toFixed(1)}" | velocity ${formatVelocity(robotVelocityInPerS)}`
+    );
+    localSimulation.frameId = requestAnimationFrame(runLocalSimulationFrame);
+    return;
+  }
+
+  localSimulation.distanceTravelled = nextDistance;
+
+  const pose = interpolatePoseAtDistance(localSimulation.samples, localSimulation.distanceTravelled);
+  robotPose.x = pose.x;
+  robotPose.y = pose.y;
+  robotPose.heading = pose.heading;
+  robotMoving = true;
+  setRobotVelocityFromModel(speed, timestamp);
+  setRobotMotorRpm((speed / (Math.PI * 2)) * 60);
+  appendRobotTrailPoint({ x: robotPose.x, y: robotPose.y });
+  updateRobotCoords();
+  updateRobotMarker();
+
+  const remaining = Math.max(0, localSimulation.totalDistance - localSimulation.distanceTravelled);
+  setRobotStatus(
+    `Local simulation running | remaining ${remaining.toFixed(1)}" | velocity ${formatVelocity(robotVelocityInPerS)}`
+  );
+
+  if (localSimulation.distanceTravelled >= localSimulation.totalDistance) {
+    setRobotStatus("Local simulation complete.");
+    stopLocalSimulation();
+    return;
+  }
+
+  localSimulation.frameId = requestAnimationFrame(runLocalSimulationFrame);
+}
+
+function startLocalSimulation() {
+  const pts = getPts();
+  const decorated = decorateSamples(sampleDrivePath(pts, SAMPLES_PER_SEG));
+  if (decorated.length < 2) {
+    alert("Add at least 2 waypoints before running.");
+    return;
+  }
+
+  stopRobotPolling();
+  stopLocalSimulation();
+  robotApiConnected = false;
+  localSimulation.active = true;
+  localSimulation.samples = decorated;
+  localSimulation.totalDistance = decorated[decorated.length - 1].cumulativeDistance;
+  localSimulation.currentSpeed = 0;
+  localSimulation.distanceTravelled = 0;
+  localSimulation.lastTimestamp = null;
+  localSimulation.cornerStopDistances = extractCornerStopDistances(decorated);
+  localSimulation.completedCornerStops = new Set();
+  localSimulation.pauseRemainingS = 0;
+
+  const startPose = decorated[0];
+  robotPose.x = startPose.in.x;
+  robotPose.y = startPose.in.y;
+  robotPose.heading = 0;
+  robotMoving = true;
+  setRobotVelocityFromModel(0);
+  setRobotMotorRpm(0);
+  clearRobotTrail();
+  appendRobotTrailPoint({ x: robotPose.x, y: robotPose.y });
+  updateRobotCoords();
+  updateRobotMarker();
+  updateTelemetry({});
+  runBtn.disabled = true;
+  runBtn.textContent = "Running...";
+  setRobotStatus("Local simulation started.");
+
+  localSimulation.frameId = requestAnimationFrame(runLocalSimulationFrame);
 }
 
 /* =======================
@@ -810,6 +1637,10 @@ curvePath.setAttribute("stroke-width", "4");
 curvePath.setAttribute("stroke-linecap", "round");
 curvePath.setAttribute("stroke-linejoin", "round");
 svg.appendChild(curvePath);
+
+const robotTrailPath = document.createElementNS("http://www.w3.org/2000/svg", "path");
+robotTrailPath.setAttribute("class", "robotTrail");
+svg.appendChild(robotTrailPath);
 
 const previewPath = document.createElementNS("http://www.w3.org/2000/svg", "path");
 previewPath.setAttribute("fill", "none");
@@ -846,10 +1677,10 @@ function setModeUI() {
 
 function updateCurveOnly() {
   const pts = getPts();
-  const pointsPx = pts.map(toPx);
+  const pointsPx = buildDrivePathPoints(pts).map(toPx);
 
   if (pointsPx.length >= 2) {
-    curvePath.setAttribute("d", catmullRomPathD(pointsPx, Number(tensionSlider.value)));
+    curvePath.setAttribute("d", polylinePathD(pointsPx));
     curvePath.style.display = "";
   } else {
     curvePath.setAttribute("d", "");
@@ -857,8 +1688,8 @@ function updateCurveOnly() {
   }
 
   if (!viewMode && hoverIn && pts.length >= 1) {
-    const previewPts = [...pts, hoverIn].map(toPx);
-    previewPath.setAttribute("d", catmullRomPathD(previewPts, Number(tensionSlider.value)));
+    const previewPts = buildDrivePathPoints([...pts, hoverIn]).map(toPx);
+    previewPath.setAttribute("d", polylinePathD(previewPts));
     previewPath.style.display = "";
   } else {
     previewPath.setAttribute("d", "");
@@ -873,7 +1704,7 @@ function updateArrows() {
   if (!showArrows.checked) return;
   if (pts.length < 2) return;
 
-  const samples = sampleSpline(pts, SAMPLES_PER_SEG);
+  const samples = sampleDrivePath(pts, SAMPLES_PER_SEG);
   for (let i = 0; i + 1 < samples.length; i += ARROW_EVERY_N) {
     const a = samples[i].px;
     const b = samples[i + 1].px;
@@ -910,7 +1741,7 @@ function updateLength() {
     return;
   }
 
-  const samples = sampleSpline(pts, SAMPLES_PER_SEG);
+  const samples = sampleDrivePath(pts, SAMPLES_PER_SEG);
   let lenPx = 0;
   for (let i = 1; i < samples.length; i++) {
     lenPx += distPx(samples[i - 1].px, samples[i].px);
@@ -935,13 +1766,20 @@ function fullRender() {
   updateCurveOnly();
   updateArrows();
   updateLength();
+  updateCourseEstimate();
 
-  if (pts.length > 0) {
+  if (!robotApiConnected && !localSimulation.active && pts.length > 0) {
     robotPose.x = pts[0].x;
     robotPose.y = pts[0].y;
+    robotPose.heading = 0;
+    clearRobotTrail();
+    appendRobotTrailPoint({ x: robotPose.x, y: robotPose.y });
+  } else if (!robotApiConnected && !localSimulation.active && pts.length === 0) {
+    clearRobotTrail();
   }
 
   updateRobotCoords();
+  updateRobotMarker();
 
   document.querySelectorAll(".pt[data-idx]").forEach(el => el.remove());
 
@@ -1189,7 +2027,7 @@ linkRobotPathsBtn.onclick = () => {
 
 function sampledPathJSON() {
   const pts = getPts();
-  const samples = sampleSpline(pts, SAMPLES_PER_SEG);
+  const samples = sampleDrivePath(pts, SAMPLES_PER_SEG);
 
   const arr = samples.map(s => ([
     Number(s.in.x.toFixed(2)),
@@ -1208,14 +2046,13 @@ document.getElementById("save").onclick = () => {
   const name = prompt("Save name?", "robot-paths-1");
   if (!name) return;
 
-  const payload = {
-    ...buildRobotPathsPayload(),
-    ui: {
-      controlMode,
-      tension: Number(tensionSlider.value),
-      snap: { on: snapOn.checked, step: Number(snapStep.value) }
-    },
-    updatedAt: new Date().toISOString()
+      const payload = {
+        ...buildRobotPathsPayload(),
+        ui: {
+          controlMode,
+          snap: { on: snapOn.checked, step: Number(snapStep.value) }
+        },
+        updatedAt: new Date().toISOString()
   };
 
   localStorage.setItem("robotFieldUI:" + name, JSON.stringify(payload));
@@ -1297,11 +2134,6 @@ addTypedBtn.onclick = () => {
   });
 });
 
-tensionSlider.addEventListener("input", () => {
-  tensionVal.textContent = Number(tensionSlider.value).toFixed(2);
-  fullRender();
-});
-
 showArrows.addEventListener("change", fullRender);
 
 showGrid.addEventListener("change", () => {
@@ -1311,7 +2143,6 @@ showGrid.addEventListener("change", () => {
 /* =======================
    Init
 ======================= */
-tensionVal.textContent = Number(tensionSlider.value).toFixed(2);
 grid.style.display = showGrid.checked ? "" : "none";
 autonBtn.classList.toggle("active", controlMode === "auton");
 teleopBtn.classList.toggle("active", controlMode === "teleop");

@@ -12,7 +12,18 @@ from dataclasses import dataclass
 from math import acos, sqrt
 from typing import Protocol
 
-from constants import DEFAULT_CONTROL_DT_S, MAX_DRIVE_OUTPUT
+from constants import (
+    DEFAULT_CONTROL_DT_S,
+    FOLLOWER_ACCEL_RAMP_PER_S,
+    FOLLOWER_CORNER_SLOWDOWN_GAIN,
+    FOLLOWER_CORNER_STOP_DISTANCE_IN,
+    FOLLOWER_CORNER_STOP_DURATION_S,
+    FOLLOWER_STOP_BRAKE_DISTANCE_IN,
+    FOLLOWER_DECEL_RAMP_PER_S,
+    FOLLOWER_LONG_RUN_DISTANCE_IN,
+    FOLLOWER_SLOWDOWN_DISTANCE_IN,
+    MAX_DRIVE_OUTPUT,
+)
 from drivetrain import MotorCommand, PathFollower as DriveController
 from odom import Pose2D
 
@@ -51,17 +62,33 @@ class PurePursuitFollower:
         min_speed: float = 0.1,
         max_speed: float = 1.0,
         goal_tolerance_in: float = 0.75,
-        speed_ramp_per_s: float = 1.8,
+        accel_ramp_per_s: float = FOLLOWER_ACCEL_RAMP_PER_S,
+        decel_ramp_per_s: float = FOLLOWER_DECEL_RAMP_PER_S,
+        long_run_distance_in: float = FOLLOWER_LONG_RUN_DISTANCE_IN,
+        slowdown_distance_in: float = FOLLOWER_SLOWDOWN_DISTANCE_IN,
+        corner_slowdown_gain: float = FOLLOWER_CORNER_SLOWDOWN_GAIN,
+        corner_stop_duration_s: float = FOLLOWER_CORNER_STOP_DURATION_S,
+        corner_stop_distance_in: float = FOLLOWER_CORNER_STOP_DISTANCE_IN,
+        stop_brake_distance_in: float = FOLLOWER_STOP_BRAKE_DISTANCE_IN,
     ):
         self.lookahead_in = lookahead_in
         self.min_speed = min_speed
         self.max_speed = max_speed
         self.goal_tolerance_in = goal_tolerance_in
-        self.speed_ramp_per_s = speed_ramp_per_s
+        self.accel_ramp_per_s = accel_ramp_per_s
+        self.decel_ramp_per_s = decel_ramp_per_s
+        self.long_run_distance_in = long_run_distance_in
+        self.slowdown_distance_in = slowdown_distance_in
+        self.corner_slowdown_gain = corner_slowdown_gain
+        self.corner_stop_duration_s = corner_stop_duration_s
+        self.corner_stop_distance_in = corner_stop_distance_in
+        self.stop_brake_distance_in = stop_brake_distance_in
         self.drive_controller = DriveController()
         self.path: list[PathPoint] = []
         self.current_index = 0
         self.last_speed_scale = min_speed
+        self.corner_stop_remaining_s = 0.0
+        self.completed_corner_stops: set[int] = set()
 
     def load_path(self, points: list[PathPoint]) -> None:
         self.path = points
@@ -70,6 +97,8 @@ class PurePursuitFollower:
     def reset(self) -> None:
         self.current_index = 0
         self.last_speed_scale = self.min_speed
+        self.corner_stop_remaining_s = 0.0
+        self.completed_corner_stops.clear()
         self.drive_controller.reset()
 
     def is_finished(self, pose: Pose2D) -> bool:
@@ -209,35 +238,90 @@ class PurePursuitFollower:
         turn_angle = acos(cos_theta)
         return clamp(turn_angle / 3.141592653589793, 0.0, 1.0)
 
+    def _distance_until_turn(self, closest: ClosestPathSample) -> float:
+        if len(self.path) < 3:
+            return float("inf")
+
+        segment_index = min(max(closest.segment_index, 0), len(self.path) - 2)
+        if segment_index >= len(self.path) - 2:
+            return float("inf")
+
+        current_end = self.path[segment_index + 1]
+        dx = current_end.x - closest.point.x
+        dy = current_end.y - closest.point.y
+        return sqrt(dx * dx + dy * dy)
+
+    def _distance_until_stop(self, closest: ClosestPathSample, pose: Pose2D) -> float:
+        distance_until_turn = self._distance_until_turn(closest)
+        remaining = pose.distance_to(self.path[-1].x, self.path[-1].y)
+        return min(distance_until_turn, remaining)
+
     def _compute_speed_scale(
         self,
         pose: Pose2D,
         target: PathPoint,
         closest: ClosestPathSample,
         dt: float,
-    ) -> float:
+    ) -> tuple[float, dict]:
         remaining = pose.distance_to(self.path[-1].x, self.path[-1].y)
         target_dist = pose.distance_to(target.x, target.y)
         turn_severity = self._segment_turn_severity(closest)
-
-        # Slow near the end of the path, around sharper corners, and when the
-        # lookahead target is very close, but do not jump instantly between values.
-        end_scale = clamp(remaining / 14.0, self.min_speed, self.max_speed)
-        target_scale = clamp(target_dist / max(self.lookahead_in, 1e-6), self.min_speed, 1.0)
-        corner_scale = clamp(self.max_speed - 0.55 * turn_severity, self.min_speed, self.max_speed)
-        requested_scale = clamp(
-            min(end_scale, target_scale, corner_scale),
+        distance_until_turn = self._distance_until_turn(closest)
+        distance_until_stop = self._distance_until_stop(closest, pose)
+        long_run_scale = clamp(
+            remaining / max(self.long_run_distance_in, 1e-6),
             self.min_speed,
             self.max_speed,
         )
-        max_delta = self.speed_ramp_per_s * max(dt, 1e-6)
+
+        # Speed up on long straight runs, then brake for the end of the path,
+        # nearby corners, and very close lookahead points.
+        end_scale = clamp(
+            remaining / max(self.slowdown_distance_in, 1e-6),
+            self.min_speed,
+            self.max_speed,
+        )
+        normalized_stop_distance = clamp(
+            distance_until_stop / max(self.stop_brake_distance_in, 1e-6),
+            0.0,
+            1.0,
+        )
+        stop_scale = clamp(normalized_stop_distance * normalized_stop_distance, 0.02, self.max_speed)
+        target_scale = clamp(target_dist / max(self.lookahead_in, 1e-6), self.min_speed, 1.0)
+        corner_scale = self.max_speed
+        if turn_severity > 0.0 and distance_until_turn != float("inf"):
+            corner_window = max(self.lookahead_in * 2.0, 1e-6)
+            approach_scale = clamp(distance_until_turn / corner_window, 0.0, 1.0)
+            approach_weight = approach_scale * approach_scale
+            raw_corner_scale = self.max_speed - self.corner_slowdown_gain * turn_severity
+            corner_floor = clamp(raw_corner_scale, 0.12, self.max_speed)
+            corner_scale = clamp(
+                corner_floor + (self.max_speed - corner_floor) * approach_weight,
+                self.min_speed,
+                self.max_speed,
+            )
+        requested_scale = clamp(
+            min(long_run_scale, end_scale, stop_scale, target_scale, corner_scale),
+            self.min_speed,
+            self.max_speed,
+        )
+        ramp_rate = self.accel_ramp_per_s if requested_scale >= self.last_speed_scale else self.decel_ramp_per_s
+        max_delta = ramp_rate * max(dt, 1e-6)
         smoothed_scale = clamp(
             requested_scale,
             self.last_speed_scale - max_delta,
             self.last_speed_scale + max_delta,
         )
         self.last_speed_scale = smoothed_scale
-        return smoothed_scale
+        return smoothed_scale, {
+            "long_run_scale": long_run_scale,
+            "end_scale": end_scale,
+            "target_scale": target_scale,
+            "stop_scale": stop_scale,
+            "corner_scale": corner_scale,
+            "distance_until_turn": distance_until_turn,
+            "distance_until_stop": distance_until_stop,
+        }
 
     def update(
         self,
@@ -247,8 +331,46 @@ class PurePursuitFollower:
         if not self.path:
             return MotorCommand(0.0, 0.0), {"finished": True, "reason": "empty path"}
 
+        if self.corner_stop_remaining_s > 0.0:
+            self.corner_stop_remaining_s = max(0.0, self.corner_stop_remaining_s - dt)
+            return MotorCommand(0.0, 0.0), {
+                "finished": False,
+                "reason": "corner_stop",
+                "paused_for_corner": True,
+                "corner_stop_remaining_s": self.corner_stop_remaining_s,
+                "speed_scale": 0.0,
+                "turn_severity": 0.0,
+                "remaining_distance": pose.distance_to(self.path[-1].x, self.path[-1].y),
+                "current_index": self.current_index,
+                "lookahead_x": pose.x,
+                "lookahead_y": pose.y,
+            }
+
         lookahead, closest = self._select_lookahead_point(pose)
-        speed_scale = self._compute_speed_scale(pose, lookahead, closest, dt)
+        turn_severity = self._segment_turn_severity(closest)
+        distance_until_turn = self._distance_until_turn(closest)
+        if (
+            turn_severity > 0.08
+            and distance_until_turn <= self.corner_stop_distance_in
+            and closest.segment_index not in self.completed_corner_stops
+        ):
+            self.completed_corner_stops.add(closest.segment_index)
+            self.corner_stop_remaining_s = self.corner_stop_duration_s
+            return MotorCommand(0.0, 0.0), {
+                "finished": False,
+                "reason": "corner_stop",
+                "paused_for_corner": True,
+                "corner_stop_remaining_s": self.corner_stop_remaining_s,
+                "speed_scale": 0.0,
+                "turn_severity": turn_severity,
+                "remaining_distance": pose.distance_to(self.path[-1].x, self.path[-1].y),
+                "current_index": self.current_index,
+                "lookahead_x": lookahead.x,
+                "lookahead_y": lookahead.y,
+                "distance_until_turn": distance_until_turn,
+            }
+
+        speed_scale, speed_debug = self._compute_speed_scale(pose, lookahead, closest, dt)
 
         command, debug = self.drive_controller.command_to_waypoint(
             pose=pose,
@@ -272,11 +394,14 @@ class PurePursuitFollower:
                 "closest_y": closest.point.y,
                 "closest_distance": closest.distance,
                 "speed_scale": speed_scale,
-                "turn_severity": self._segment_turn_severity(closest),
+                "turn_severity": turn_severity,
                 "remaining_distance": pose.distance_to(goal.x, goal.y),
                 "current_index": self.current_index,
+                "paused_for_corner": False,
+                "corner_stop_remaining_s": 0.0,
             }
         )
+        debug.update(speed_debug)
         return scaled_command, debug
 
 
