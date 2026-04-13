@@ -3,7 +3,6 @@ from __future__ import annotations
 import argparse
 import json
 import threading
-from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -18,10 +17,9 @@ def utc_timestamp() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
-@dataclass
 class RobotStateStore:
-    snapshot: Dict[str, Any] = field(
-        default_factory=lambda: {
+    def __init__(self) -> None:
+        self.snapshot = {
             "connected": False,
             "running": False,
             "mode": "auton",
@@ -41,9 +39,6 @@ class RobotStateStore:
             "max_steps": 0,
             "updated_at": utc_timestamp(),
         }
-    )
-
-    def __post_init__(self) -> None:
         self._lock = threading.Lock()
         self._run_thread = None  # type: Optional[threading.Thread]
 
