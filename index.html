@@ -711,7 +711,6 @@
       <div class="sensorStatusRow"><span class="debugLabel">Serial</span><span id="debugSerialBadge" class="sensorBadge disconnected">Disconnected</span></div>
       <div class="sensorStatusRow"><span class="debugLabel">Front motor</span><span id="debugFrontMotorBadge" class="sensorBadge disconnected">Disconnected</span></div>
       <div class="sensorStatusRow"><span class="debugLabel">Back motor</span><span id="debugBackMotorBadge" class="sensorBadge disconnected">Disconnected</span></div>
-      <div class="sensorStatusRow"><span class="debugLabel">Encoders</span><span id="debugEncoderBadge" class="sensorBadge disconnected">Disconnected</span></div>
       <div class="sensorStatusRow"><span class="debugLabel">IR sensors</span><span id="debugIrBadge" class="sensorBadge disconnected">Disconnected</span></div>
       <div class="sensorStatusRow"><span class="debugLabel">Motor temp</span><span id="debugTempBadge" class="sensorBadge disconnected">Disconnected</span></div>
       <div class="sensorStatusRow"><span class="debugLabel">Battery %</span><span id="debugBatteryBadge" class="sensorBadge disconnected">Disconnected</span></div>
@@ -839,7 +838,6 @@ const debugCameraBadge = document.getElementById("debugCameraBadge");
 const debugSerialBadge = document.getElementById("debugSerialBadge");
 const debugFrontMotorBadge = document.getElementById("debugFrontMotorBadge");
 const debugBackMotorBadge = document.getElementById("debugBackMotorBadge");
-const debugEncoderBadge = document.getElementById("debugEncoderBadge");
 const debugIrBadge = document.getElementById("debugIrBadge");
 const debugTempBadge = document.getElementById("debugTempBadge");
 const debugBatteryBadge = document.getElementById("debugBatteryBadge");
@@ -1084,7 +1082,6 @@ function updateDebugPanel(payload = null) {
   setSensorBadge(debugSerialBadge, serialConnected);
   setSensorBadge(debugFrontMotorBadge, frontMotorConnected);
   setSensorBadge(debugBackMotorBadge, backMotorConnected);
-  setSensorBadge(debugEncoderBadge, encoderConnected);
   setSensorBadge(debugIrBadge, !!irConnected);
   setSensorBadge(debugTempBadge, tempConnected);
   setSensorBadge(debugBatteryBadge, batteryConnected);
