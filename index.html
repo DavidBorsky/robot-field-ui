@@ -711,18 +711,15 @@
       <div class="sensorStatusRow"><span class="debugLabel">Serial</span><span id="debugSerialBadge" class="sensorBadge disconnected">Disconnected</span></div>
       <div class="sensorStatusRow"><span class="debugLabel">Front motor</span><span id="debugFrontMotorBadge" class="sensorBadge disconnected">Disconnected</span></div>
       <div class="sensorStatusRow"><span class="debugLabel">Back motor</span><span id="debugBackMotorBadge" class="sensorBadge disconnected">Disconnected</span></div>
+      <div class="sensorStatusRow"><span class="debugLabel">Battery %</span><span id="debugBatteryBadge" class="sensorBadge disconnected">Disconnected</span></div>
       <div class="sensorStatusRow"><span class="debugLabel">Left IR</span><span id="debugLeftIrBadge" class="sensorBadge disconnected">Disconnected</span></div>
       <div class="sensorStatusRow"><span class="debugLabel">Right IR</span><span id="debugRightIrBadge" class="sensorBadge disconnected">Disconnected</span></div>
-      <div class="sensorStatusRow"><span class="debugLabel">Motor temp</span><span id="debugTempBadge" class="sensorBadge disconnected">Disconnected</span></div>
-      <div class="sensorStatusRow"><span class="debugLabel">Battery %</span><span id="debugBatteryBadge" class="sensorBadge disconnected">Disconnected</span></div>
       <div class="sensorStatusRow"><span class="debugLabel">Camera</span><span id="debugCameraBadge" class="sensorBadge disconnected">Disconnected</span></div>
     </div>
   </div>
 
   <div class="debugSection">
     <div class="debugSectionTitle">Telemetry</div>
-    <div class="debugRow"><span class="debugLabel">Front motor temp:</span> <span id="frontMotorTemp" class="debugValue">--</span></div>
-    <div class="debugRow"><span class="debugLabel">Back motor temp:</span> <span id="backMotorTemp" class="debugValue">--</span></div>
     <div class="debugRow"><span class="debugLabel">Battery percentage:</span> <span id="batteryPercentage" class="debugValue">--</span></div>
   </div>
 
@@ -841,7 +838,6 @@ const debugFrontMotorBadge = document.getElementById("debugFrontMotorBadge");
 const debugBackMotorBadge = document.getElementById("debugBackMotorBadge");
 const debugLeftIrBadge = document.getElementById("debugLeftIrBadge");
 const debugRightIrBadge = document.getElementById("debugRightIrBadge");
-const debugTempBadge = document.getElementById("debugTempBadge");
 const debugBatteryBadge = document.getElementById("debugBatteryBadge");
 const debugApiState = document.getElementById("debugApiState");
 const debugConnectionMode = document.getElementById("debugConnectionMode");
