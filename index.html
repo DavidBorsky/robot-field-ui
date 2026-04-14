@@ -922,6 +922,10 @@ let localSimulation = {
   currentSpeed: 0,
   distanceTravelled: 0,
   lastTimestamp: null,
+  prevPose: null,
+  prevTimestamp: null,
+  forwardVelocity: 0,
+  strafeVelocity: 0,
   cornerStopDistances: [],
   completedCornerStops: new Set(),
   pauseRemainingS: 0
@@ -1083,14 +1087,13 @@ function buildSimDebugPayload() {
   const remaining = localSimulation.active
     ? Math.max(0, localSimulation.totalDistance - localSimulation.distanceTravelled)
     : null;
-  const velocityComponents = getPoseVelocityComponents();
   return {
     connection: "simulated",
     status: localSimulation.active ? "simulated" : "idle",
     detail: localSimulation.active ? "local simulation" : "--",
     pose: { heading_deg: robotPose.heading },
-    forward_velocity_in_per_s: velocityComponents.forward,
-    strafe_velocity_in_per_s: velocityComponents.strafe,
+    forward_velocity_in_per_s: localSimulation.forwardVelocity,
+    strafe_velocity_in_per_s: localSimulation.strafeVelocity,
     remaining_distance: remaining,
     paused_for_corner: localSimulation.pauseRemainingS > 0,
     corner_stop_remaining_s: localSimulation.pauseRemainingS,
@@ -1979,6 +1982,10 @@ function stopLocalSimulation({ preservePose = true } = {}) {
   localSimulation.currentSpeed = 0;
   localSimulation.distanceTravelled = 0;
   localSimulation.lastTimestamp = null;
+  localSimulation.prevPose = null;
+  localSimulation.prevTimestamp = null;
+  localSimulation.forwardVelocity = 0;
+  localSimulation.strafeVelocity = 0;
   localSimulation.cornerStopDistances = [];
   localSimulation.completedCornerStops = new Set();
   localSimulation.pauseRemainingS = 0;
@@ -2004,6 +2011,10 @@ function runLocalSimulationFrame(timestamp) {
   if (localSimulation.lastTimestamp == null) {
     localSimulation.lastTimestamp = timestamp;
   }
+  if (localSimulation.prevTimestamp == null) {
+    localSimulation.prevTimestamp = timestamp;
+    localSimulation.prevPose = { x: robotPose.x, y: robotPose.y, heading: robotPose.heading };
+  }
 
   const dt = Math.min((timestamp - localSimulation.lastTimestamp) / 1000, 0.05);
   localSimulation.lastTimestamp = timestamp;
@@ -2012,6 +2023,8 @@ function runLocalSimulationFrame(timestamp) {
     localSimulation.pauseRemainingS = Math.max(0, localSimulation.pauseRemainingS - dt);
     robotMoving = false;
     localSimulation.currentSpeed = 0;
+    localSimulation.forwardVelocity = 0;
+    localSimulation.strafeVelocity = 0;
     setRobotVelocityFromModel(0, timestamp);
     setRobotMotorRpm(0);
     updateRobotMarker();
@@ -2090,6 +2103,19 @@ function runLocalSimulationFrame(timestamp) {
   robotPose.y = pose.y;
   robotPose.heading = pose.heading;
   robotMoving = true;
+
+  const headingRad = (robotPose.heading || 0) * Math.PI / 180;
+  const cosH = Math.cos(headingRad);
+  const sinH = Math.sin(headingRad);
+  const prev = localSimulation.prevPose || { x: robotPose.x, y: robotPose.y, heading: robotPose.heading };
+  const vdt = Math.max((timestamp - localSimulation.prevTimestamp) / 1000, 1e-6);
+  const dx = robotPose.x - prev.x;
+  const dy = robotPose.y - prev.y;
+  localSimulation.forwardVelocity = ((dx * cosH) + (dy * sinH)) / vdt;
+  localSimulation.strafeVelocity = ((-dx * sinH) + (dy * cosH)) / vdt;
+  localSimulation.prevPose = { x: robotPose.x, y: robotPose.y, heading: robotPose.heading };
+  localSimulation.prevTimestamp = timestamp;
+
   setRobotVelocityFromModel(speed, timestamp);
   setRobotMotorRpm((speed / (Math.PI * 2)) * 60);
   appendRobotTrailPoint({ x: robotPose.x, y: robotPose.y });
