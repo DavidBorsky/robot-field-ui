@@ -25,11 +25,14 @@
   .rightPanel {
     width: 420px;
     min-height: 760px;
-    border: 2px solid rgba(0,0,0,0.2);
-    border-radius: 16px;
-    background: rgba(0,0,0,0.04);
-    padding: 14px 14px 24px;
+    display: grid;
+    gap: 14px;
+    border: 2px solid rgba(0,0,0,0.14);
+    border-radius: 20px;
+    background: linear-gradient(180deg, rgba(249,249,249,0.96), rgba(241,241,241,0.9));
+    padding: 14px;
     box-sizing: border-box;
+    box-shadow: 0 14px 30px rgba(0,0,0,0.08);
   }
 
   #wrap { width: 960px; }
@@ -274,10 +277,38 @@
     font-size: 13px;
   }
 
+  .sideCard {
+    border: 1px solid rgba(0,0,0,0.12);
+    border-radius: 16px;
+    background: rgba(255,255,255,0.9);
+    padding: 14px;
+    box-shadow: 0 8px 18px rgba(0,0,0,0.04);
+  }
+
+  .sideCardHeader {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 12px;
+    margin-bottom: 12px;
+  }
+
+  .sideCardTitle {
+    font-size: 17px;
+    font-weight: 800;
+    color: #111;
+  }
+
+  .sideCardSub {
+    font-size: 12px;
+    line-height: 1.4;
+    color: #555;
+    margin-top: 3px;
+  }
+
   .cameraTitle {
     font-size: 18px;
-    font-weight: 700;
-    margin-bottom: 12px;
+    font-weight: 800;
   }
 
   .cameraView {
@@ -296,16 +327,16 @@
   }
 
   .cameraCoords {
-    margin-top: 14px;
+    margin-top: 12px;
     padding: 12px 14px;
     border: 1px solid rgba(0,0,0,0.12);
     border-radius: 12px;
-    background: rgba(255,255,255,0.7);
+    background: rgba(247,247,247,0.92);
   }
 
   .cameraCoordsTitle {
     font-size: 15px;
-    font-weight: 700;
+    font-weight: 800;
     margin-bottom: 8px;
   }
 
@@ -318,7 +349,6 @@
   }
 
   .robotApiControls {
-    margin-top: 14px;
     display: grid;
     gap: 10px;
   }
@@ -343,19 +373,41 @@
   }
 
   .robotStatus {
-    margin-top: 12px;
     padding: 10px 12px;
     border-radius: 10px;
-    background: rgba(0,0,0,0.05);
+    background: rgba(0,0,0,0.045);
+    border: 1px solid rgba(0,0,0,0.08);
     font-size: 13px;
     line-height: 1.4;
     color: #222;
   }
 
   .runSection {
-    margin-top: 14px;
     display: grid;
     gap: 10px;
+  }
+
+  .controlStack {
+    display: grid;
+    gap: 12px;
+  }
+
+  .controlSection {
+    display: grid;
+    gap: 10px;
+  }
+
+  .controlSection + .controlSection {
+    padding-top: 12px;
+    border-top: 1px solid rgba(0,0,0,0.08);
+  }
+
+  .controlSectionLabel {
+    font-size: 12px;
+    font-weight: 800;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: #555;
   }
 
   .runBtn {
@@ -419,7 +471,6 @@
   }
 
   .cameraHint {
-    margin-top: 12px;
     font-size: 13px;
     color: #444;
     line-height: 1.4;
@@ -435,7 +486,7 @@
     font-size: 14px;
     font-weight: 700;
     cursor: pointer;
-    margin: 14px 0 0;
+    margin: 0;
   }
 
   .debugDrawer {
@@ -656,43 +707,68 @@
   </div>
 
   <div class="rightPanel">
-    <div class="cameraTitle">Camera View</div>
+    <div class="sideCard">
+      <div class="sideCardHeader">
+        <div>
+          <div class="cameraTitle">Camera View</div>
+          <div class="sideCardSub">Live robot camera feed from the Raspberry Pi.</div>
+        </div>
+      </div>
 
-    <div class="cameraView" id="cameraView">
-      <img id="cameraFeed" src="" alt="Camera feed" style="width: 100%; height: 100%; object-fit: contain; display: none;">
-      <div id="cameraPlaceholder" style="width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; color: white; font-size: 18px;">Loading camera...</div>
-    </div>
+      <div class="cameraView" id="cameraView">
+        <img id="cameraFeed" src="" alt="Camera feed" style="width: 100%; height: 100%; object-fit: contain; display: none;">
+        <div id="cameraPlaceholder" style="width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; color: white; font-size: 18px;">Loading camera...</div>
+      </div>
 
-    <div class="cameraCoords">
-      <div class="cameraCoordsTitle">Robot Coordinates</div>
-      <div class="cameraCoordsRow"><span>X:</span> <span id="robotX">0.00</span></div>
-      <div class="cameraCoordsRow"><span>Y:</span> <span id="robotY">0.00</span></div>
-      <div class="cameraCoordsRow"><span>Velocity:</span> <span id="robotVelocity">0.00 in/s</span></div>
-      <div class="cameraCoordsRow"><span>Motor RPM:</span> <span id="robotMotorRpm">0.0</span></div>
-    </div>
-
-    <div id="robotStatus" class="robotStatus">Robot API not connected yet.</div>
-
-    <div class="runSection">
-      <button id="runBtn" class="runBtn" type="button">Run</button>
-      <button id="resetBtn" class="resetBtn" type="button">Reset Pose</button>
-    </div>
-
-    <button id="debugToggleBtn" class="debugToggleBtn" type="button">Open Debug Panel</button>
-
-    <div class="robotApiControls">
-      <input id="robotApiUrl" type="text" value="http://raspberrypi.local:8765" placeholder="Robot API URL">
-      <div class="robotApiRow">
-        <select id="robotConnectionMode">
-          <option value="serial" selected>Arduino serial</option>
-          <option value="simulated">Simulated</option>
-        </select>
-        <button id="connectRobotBtn" type="button">Connect</button>
+      <div class="cameraCoords">
+        <div class="cameraCoordsTitle">Robot Coordinates</div>
+        <div class="cameraCoordsRow"><span>X:</span> <span id="robotX">0.00</span></div>
+        <div class="cameraCoordsRow"><span>Y:</span> <span id="robotY">0.00</span></div>
+        <div class="cameraCoordsRow"><span>Velocity:</span> <span id="robotVelocity">0.00 in/s</span></div>
+        <div class="cameraCoordsRow"><span>Motor RPM:</span> <span id="robotMotorRpm">0.0</span></div>
       </div>
     </div>
 
-    <div class="cameraHint">
-      This space is reserved for your live robot camera, webcam feed, or vision output.
+    <div class="sideCard">
+      <div class="sideCardHeader">
+        <div>
+          <div class="sideCardTitle">Robot Console</div>
+          <div class="sideCardSub">Run the robot, reset pose, and manage the live connection.</div>
+        </div>
+      </div>
+
+      <div class="controlStack">
+        <div class="controlSection">
+          <div class="controlSectionLabel">Status</div>
+          <div id="robotStatus" class="robotStatus">Robot API not connected yet.</div>
+        </div>
+
+        <div class="controlSection">
+          <div class="controlSectionLabel">Run Controls</div>
+          <div class="runSection">
+            <button id="runBtn" class="runBtn" type="button">Run</button>
+            <button id="resetBtn" class="resetBtn" type="button">Reset Pose</button>
+          </div>
+          <button id="debugToggleBtn" class="debugToggleBtn" type="button">Open Debug Panel</button>
+        </div>
+
+        <div class="controlSection">
+          <div class="controlSectionLabel">Connection</div>
+          <div class="robotApiControls">
+            <input id="robotApiUrl" type="text" value="http://raspberrypi.local:8765" placeholder="Robot API URL">
+            <div class="robotApiRow">
+              <select id="robotConnectionMode">
+                <option value="serial" selected>Arduino serial</option>
+                <option value="simulated">Simulated</option>
+              </select>
+              <button id="connectRobotBtn" type="button">Connect</button>
+            </div>
+          </div>
+          <div class="cameraHint">
+            Use serial for the real Arduino link or simulated to preview the route locally.
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 </div>
