@@ -42,11 +42,27 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
+    gap: 16px;
     margin-bottom: 10px;
   }
 
   .topBar h2 {
     margin: 0;
+  }
+
+  .topBarActions {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 10px;
+    flex: 1 1 auto;
+  }
+
+  .fieldModeBar {
+    width: 960px;
+    display: flex;
+    justify-content: center;
+    margin-bottom: 10px;
   }
 
   .modeToggle {
@@ -364,6 +380,35 @@
     gap: 10px;
   }
 
+  .topConnectionControls {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 10px;
+    border: 1px solid rgba(0,0,0,0.14);
+    border-radius: 14px;
+    background: rgba(255,255,255,0.92);
+    box-shadow: 0 6px 16px rgba(0,0,0,0.05);
+  }
+
+  .topConnectionControls input,
+  .topConnectionControls select {
+    padding: 8px 10px;
+    border: 1px solid rgba(0,0,0,0.2);
+    border-radius: 10px;
+    font-size: 13px;
+    box-sizing: border-box;
+    margin: 0;
+  }
+
+  .topConnectionControls input {
+    width: 260px;
+  }
+
+  .topConnectionControls button {
+    margin: 0;
+  }
+
   .robotApiControls input,
   .robotApiControls select {
     width: 100%;
@@ -645,13 +690,26 @@
     <div class="topBar">
       <h2>Waypoint Field Console</h2>
 
-      <div class="modeToggle" id="controlModeToggle" aria-label="Control mode toggle">
-        <button id="autonBtn" class="modeBtn active" type="button">Auton</button>
-        <button id="teleopBtn" class="modeBtn" type="button">Teleop</button>
+      <div class="topBarActions">
+        <div class="topConnectionControls">
+          <input id="robotApiUrl" type="text" value="http://raspberrypi.local:8765" placeholder="Robot API URL">
+          <select id="robotConnectionMode">
+            <option value="serial" selected>Arduino serial</option>
+            <option value="simulated">Simulated</option>
+          </select>
+          <button id="connectRobotBtn" type="button">Connect</button>
+        </div>
       </div>
     </div>
 
     <div id="wrap">
+      <div class="fieldModeBar">
+        <div class="modeToggle" id="controlModeToggle" aria-label="Control mode toggle">
+          <button id="autonBtn" class="modeBtn active" type="button">Auton</button>
+          <button id="teleopBtn" class="modeBtn" type="button">Teleop</button>
+        </div>
+      </div>
+
       <div id="field" tabindex="0" aria-label="Robot field editor">
         <div id="grid"></div>
         <svg id="lines" width="960" height="600"></svg>
@@ -772,14 +830,7 @@
         <div class="controlSection">
           <div class="controlSectionLabel">Connection</div>
           <div class="robotApiControls">
-            <input id="robotApiUrl" type="text" value="http://raspberrypi.local:8765" placeholder="Robot API URL">
-            <div class="robotApiRow">
-              <select id="robotConnectionMode">
-                <option value="serial" selected>Arduino serial</option>
-                <option value="simulated">Simulated</option>
-              </select>
-              <button id="connectRobotBtn" type="button">Connect</button>
-            </div>
+            <div class="robotStatus">Use the top-right controls to switch between serial and simulated, then connect.</div>
           </div>
           <div class="cameraHint">
             Use serial for the real Arduino link or simulated to preview the route locally.
