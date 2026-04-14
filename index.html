@@ -1114,6 +1114,7 @@ function updateDebugPanel(payload = null) {
   const backMotorConnected = (serialConnected && resolvedPayload?.back_motor_rpm != null) || simulatedConnected;
   const leftIrConnected = resolvedPayload?.left_edge_detected != null;
   const rightIrConnected = resolvedPayload?.right_edge_detected != null;
+  const fallbackVelocity = getPoseVelocityComponents();
 
   setSensorBadge(debugApiBadge, robotApiConnected);
   setSensorBadge(debugCameraBadge, cameraFeedConnected);
@@ -1134,9 +1135,25 @@ function updateDebugPanel(payload = null) {
   debugBackCount.textContent = resolvedPayload?.back_encoder_count ?? "--";
   debugFrontRpm.textContent = formatDebugNumber(resolvedPayload?.front_motor_rpm, 2);
   debugBackRpm.textContent = formatDebugNumber(resolvedPayload?.back_motor_rpm, 2);
-  debugHeading.textContent = formatDebugNumber(resolvedPayload?.pose?.heading_deg ?? robotPose.heading, 2, " deg");
-  debugForwardVelocity.textContent = formatDebugNumber(resolvedPayload?.forward_velocity_in_per_s, 2, " in/s");
-  debugStrafeVelocity.textContent = formatDebugNumber(resolvedPayload?.strafe_velocity_in_per_s, 2, " in/s");
+  debugHeading.textContent = formatDebugNumber(
+    resolvedPayload?.pose?.heading_deg ?? robotPose.heading,
+    2,
+    " deg"
+  );
+  debugForwardVelocity.textContent = formatDebugNumber(
+    Number.isFinite(resolvedPayload?.forward_velocity_in_per_s)
+      ? resolvedPayload?.forward_velocity_in_per_s
+      : fallbackVelocity.forward,
+    2,
+    " in/s"
+  );
+  debugStrafeVelocity.textContent = formatDebugNumber(
+    Number.isFinite(resolvedPayload?.strafe_velocity_in_per_s)
+      ? resolvedPayload?.strafe_velocity_in_per_s
+      : fallbackVelocity.strafe,
+    2,
+    " in/s"
+  );
   debugRemainingDistance.textContent = formatDebugNumber(resolvedPayload?.remaining_distance, 2, " in");
   debugCornerPause.textContent = resolvedPayload?.paused_for_corner
     ? formatDebugNumber(resolvedPayload?.corner_stop_remaining_s, 2, " s")
