@@ -2046,6 +2046,7 @@ function estimateDisplayedLiveTimeRemaining(payload = {}) {
   const activeCornerPauseS = Math.max(0, Number(payload.corner_stop_remaining_s) || 0);
   const routeTimeRemaining = payload.running ? estimateLiveRouteTimeRemaining() : null;
   if (routeTimeRemaining != null) {
+    liveTimeRemainingSeconds = activeCornerPauseS + routeTimeRemaining;
     return formatSeconds(activeCornerPauseS + routeTimeRemaining);
   }
 
@@ -2164,8 +2165,6 @@ function runLocalSimulationFrame(timestamp) {
     setRobotVelocityFromModel(0, timestamp);
     setRobotMotorRpm(0);
     updateRobotMarker();
-    updateRobotCoords();
-    updateDebugPanel();
     const remaining = Math.max(0, localSimulation.totalDistance - localSimulation.distanceTravelled);
     robotRemainingDistanceIn = remaining;
     const timeLeft = localSimulation.pauseRemainingS + estimateRemainingTime(
@@ -2174,6 +2173,9 @@ function runLocalSimulationFrame(timestamp) {
       localSimulation.currentSpeed,
       new Set(localSimulation.completedCornerStops)
     );
+    liveTimeRemainingSeconds = timeLeft;
+    updateRobotCoords();
+    updateDebugPanel();
     setRobotStatus(
       `Local simulation running | remaining ${remaining.toFixed(1)}" | time left ${formatSeconds(timeLeft)}`
     );
@@ -2216,9 +2218,7 @@ function runLocalSimulationFrame(timestamp) {
     setRobotVelocityFromModel(0, timestamp);
     setRobotMotorRpm(0);
     appendRobotTrailPoint({ x: robotPose.x, y: robotPose.y });
-    updateRobotCoords();
     updateRobotMarker();
-    updateDebugPanel();
     const remaining = Math.max(0, localSimulation.totalDistance - localSimulation.distanceTravelled);
     robotRemainingDistanceIn = remaining;
     const timeLeft = localSimulation.pauseRemainingS + estimateRemainingTime(
@@ -2227,6 +2227,9 @@ function runLocalSimulationFrame(timestamp) {
       localSimulation.currentSpeed,
       new Set(localSimulation.completedCornerStops)
     );
+    liveTimeRemainingSeconds = timeLeft;
+    updateRobotCoords();
+    updateDebugPanel();
     setRobotStatus(
       `Local simulation running | remaining ${remaining.toFixed(1)}" | time left ${formatSeconds(timeLeft)}`
     );
@@ -2257,9 +2260,7 @@ function runLocalSimulationFrame(timestamp) {
   setRobotVelocityFromModel(speed, timestamp);
   setRobotMotorRpm((speed / (Math.PI * 2)) * 60);
   appendRobotTrailPoint({ x: robotPose.x, y: robotPose.y });
-  updateRobotCoords();
   updateRobotMarker();
-  updateDebugPanel();
 
   const remaining = Math.max(0, localSimulation.totalDistance - localSimulation.distanceTravelled);
   robotRemainingDistanceIn = remaining;
@@ -2268,6 +2269,9 @@ function runLocalSimulationFrame(timestamp) {
     localSimulation.distanceTravelled,
     localSimulation.currentSpeed
   );
+  liveTimeRemainingSeconds = timeLeft;
+  updateRobotCoords();
+  updateDebugPanel();
   setRobotStatus(
     `Local simulation running | remaining ${remaining.toFixed(1)}" | time left ${formatSeconds(timeLeft)}`
   );
@@ -2298,6 +2302,11 @@ function startLocalSimulation() {
   localSimulation.currentSpeed = 0;
   localSimulation.distanceTravelled = 0;
   robotRemainingDistanceIn = localSimulation.totalDistance;
+  liveTimeRemainingSeconds = estimateRemainingTime(
+    localSimulation.samples,
+    localSimulation.distanceTravelled,
+    localSimulation.currentSpeed
+  );
   localSimulation.lastTimestamp = null;
   localSimulation.cornerStopDistances = extractCornerStopDistances(decorated);
   localSimulation.completedCornerStops = new Set();
