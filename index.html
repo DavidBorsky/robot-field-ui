@@ -1063,43 +1063,69 @@ function setSensorBadge(element, connected, connectedText = "Connected", disconn
   element.classList.toggle("disconnected", !connected);
 }
 
+function buildSimDebugPayload() {
+  const remaining = localSimulation.active
+    ? Math.max(0, localSimulation.totalDistance - localSimulation.distanceTravelled)
+    : null;
+  return {
+    connection: "simulated",
+    status: localSimulation.active ? "simulated" : "idle",
+    detail: localSimulation.active ? "local simulation" : "--",
+    pose: { heading_deg: robotPose.heading },
+    forward_velocity_in_per_s: robotVelocityInPerS,
+    strafe_velocity_in_per_s: 0,
+    remaining_distance: remaining,
+    paused_for_corner: localSimulation.pauseRemainingS > 0,
+    corner_stop_remaining_s: localSimulation.pauseRemainingS,
+    edge_override_active: false,
+    edge_detail: "",
+    front_motor_rpm: robotMotorRpmEstimate,
+    back_motor_rpm: robotMotorRpmEstimate,
+    telemetry: {}
+  };
+}
+
 function updateDebugPanel(payload = null) {
-  const effectiveMode = payload?.connection || robotConnectionMode.value || "--";
-  const telemetry = payload?.telemetry || {};
+  const resolvedPayload = payload == null && localSimulation.active
+    ? buildSimDebugPayload()
+    : payload;
+  const effectiveMode = resolvedPayload?.connection || robotConnectionMode.value || "--";
+  const telemetry = resolvedPayload?.telemetry || {};
   const serialConnected = !!(robotApiConnected && effectiveMode === "serial");
-  const frontMotorConnected = serialConnected && payload?.front_motor_rpm != null;
-  const backMotorConnected = serialConnected && payload?.back_motor_rpm != null;
-  const leftIrConnected = payload?.left_edge_detected != null;
-  const rightIrConnected = payload?.right_edge_detected != null;
+  const simulatedConnected = effectiveMode === "simulated" && localSimulation.active;
+  const frontMotorConnected = (serialConnected && resolvedPayload?.front_motor_rpm != null) || simulatedConnected;
+  const backMotorConnected = (serialConnected && resolvedPayload?.back_motor_rpm != null) || simulatedConnected;
+  const leftIrConnected = resolvedPayload?.left_edge_detected != null;
+  const rightIrConnected = resolvedPayload?.right_edge_detected != null;
 
   setSensorBadge(debugApiBadge, robotApiConnected);
   setSensorBadge(debugCameraBadge, cameraFeedConnected);
   setSensorBadge(debugSerialBadge, serialConnected);
-  setSensorBadge(debugFrontMotorBadge, frontMotorConnected);
-  setSensorBadge(debugBackMotorBadge, backMotorConnected);
+  setSensorBadge(debugFrontMotorBadge, frontMotorConnected, simulatedConnected ? "Simulated" : "Connected");
+  setSensorBadge(debugBackMotorBadge, backMotorConnected, simulatedConnected ? "Simulated" : "Connected");
   setSensorBadge(debugLeftIrBadge, leftIrConnected);
   setSensorBadge(debugRightIrBadge, rightIrConnected);
 
   debugApiState.textContent = robotApiConnected ? "online" : "offline";
   debugConnectionMode.textContent = effectiveMode;
-  debugRunnerStatus.textContent = payload?.status || (localSimulation.active ? "simulated" : "idle");
-  debugDetail.textContent = payload?.detail || "--";
-  debugFrontCommand.textContent = formatDebugNumber(payload?.command?.front_output, 3);
-  debugBackCommand.textContent = formatDebugNumber(payload?.command?.back_output, 3);
-  debugPowerScale.textContent = formatDebugNumber(payload?.power_scale, 2);
-  debugFrontCount.textContent = payload?.front_encoder_count ?? "--";
-  debugBackCount.textContent = payload?.back_encoder_count ?? "--";
-  debugFrontRpm.textContent = formatDebugNumber(payload?.front_motor_rpm, 2);
-  debugBackRpm.textContent = formatDebugNumber(payload?.back_motor_rpm, 2);
-  debugHeading.textContent = formatDebugNumber(payload?.pose?.heading_deg ?? robotPose.heading, 2, " deg");
-  debugForwardVelocity.textContent = formatDebugNumber(payload?.forward_velocity_in_per_s, 2, " in/s");
-  debugStrafeVelocity.textContent = formatDebugNumber(payload?.strafe_velocity_in_per_s, 2, " in/s");
-  debugRemainingDistance.textContent = formatDebugNumber(payload?.remaining_distance, 2, " in");
-  debugCornerPause.textContent = payload?.paused_for_corner
-    ? formatDebugNumber(payload?.corner_stop_remaining_s, 2, " s")
+  debugRunnerStatus.textContent = resolvedPayload?.status || (localSimulation.active ? "simulated" : "idle");
+  debugDetail.textContent = resolvedPayload?.detail || "--";
+  debugFrontCommand.textContent = formatDebugNumber(resolvedPayload?.command?.front_output, 3);
+  debugBackCommand.textContent = formatDebugNumber(resolvedPayload?.command?.back_output, 3);
+  debugPowerScale.textContent = formatDebugNumber(resolvedPayload?.power_scale, 2);
+  debugFrontCount.textContent = resolvedPayload?.front_encoder_count ?? "--";
+  debugBackCount.textContent = resolvedPayload?.back_encoder_count ?? "--";
+  debugFrontRpm.textContent = formatDebugNumber(resolvedPayload?.front_motor_rpm, 2);
+  debugBackRpm.textContent = formatDebugNumber(resolvedPayload?.back_motor_rpm, 2);
+  debugHeading.textContent = formatDebugNumber(resolvedPayload?.pose?.heading_deg ?? robotPose.heading, 2, " deg");
+  debugForwardVelocity.textContent = formatDebugNumber(resolvedPayload?.forward_velocity_in_per_s, 2, " in/s");
+  debugStrafeVelocity.textContent = formatDebugNumber(resolvedPayload?.strafe_velocity_in_per_s, 2, " in/s");
+  debugRemainingDistance.textContent = formatDebugNumber(resolvedPayload?.remaining_distance, 2, " in");
+  debugCornerPause.textContent = resolvedPayload?.paused_for_corner
+    ? formatDebugNumber(resolvedPayload?.corner_stop_remaining_s, 2, " s")
     : "inactive";
-  debugEdgeOverride.textContent = payload?.edge_override_active ? "active" : "inactive";
-  debugEdgeDetail.textContent = payload?.edge_detail || "--";
+  debugEdgeOverride.textContent = resolvedPayload?.edge_override_active ? "active" : "inactive";
+  debugEdgeDetail.textContent = resolvedPayload?.edge_detail || "--";
 }
 
 async function writeRobotPathsFileNow() {
@@ -1956,6 +1982,7 @@ function runLocalSimulationFrame(timestamp) {
     setRobotMotorRpm(0);
     updateRobotMarker();
     updateRobotCoords();
+    updateDebugPanel();
     const remaining = Math.max(0, localSimulation.totalDistance - localSimulation.distanceTravelled);
     const timeLeft = localSimulation.pauseRemainingS + estimateRemainingTime(
       localSimulation.samples,
@@ -2007,6 +2034,7 @@ function runLocalSimulationFrame(timestamp) {
     appendRobotTrailPoint({ x: robotPose.x, y: robotPose.y });
     updateRobotCoords();
     updateRobotMarker();
+    updateDebugPanel();
     const remaining = Math.max(0, localSimulation.totalDistance - localSimulation.distanceTravelled);
     const timeLeft = localSimulation.pauseRemainingS + estimateRemainingTime(
       localSimulation.samples,
@@ -2033,6 +2061,7 @@ function runLocalSimulationFrame(timestamp) {
   appendRobotTrailPoint({ x: robotPose.x, y: robotPose.y });
   updateRobotCoords();
   updateRobotMarker();
+  updateDebugPanel();
 
   const remaining = Math.max(0, localSimulation.totalDistance - localSimulation.distanceTravelled);
   const timeLeft = estimateRemainingTime(
