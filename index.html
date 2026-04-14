@@ -285,14 +285,6 @@
     box-shadow: 0 10px 22px rgba(0,0,0,0.05);
   }
 
-  .sideCardHeader {
-    display: flex;
-    justify-content: space-between;
-    align-items: flex-start;
-    gap: 12px;
-    margin-bottom: 14px;
-  }
-
   .sideCardTitle {
     font-size: 17px;
     font-weight: 800;
@@ -307,8 +299,7 @@
   }
 
   .cameraTitle {
-    font-size: 18px;
-    font-weight: 800;
+    display: none;
   }
 
   .cameraView {
@@ -737,13 +728,6 @@
 
   <div class="rightPanel">
     <div class="sideCard">
-      <div class="sideCardHeader">
-        <div>
-          <div class="cameraTitle">Camera View</div>
-          <div class="sideCardSub">Live robot camera feed from the Raspberry Pi.</div>
-        </div>
-      </div>
-
       <div class="cameraView" id="cameraView">
         <img id="cameraFeed" src="" alt="Camera feed" style="width: 100%; height: 100%; object-fit: contain; display: none;">
         <div id="cameraPlaceholder" style="width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; color: white; font-size: 18px;">Loading camera...</div>
@@ -773,12 +757,7 @@
     </div>
 
     <div class="sideCard">
-      <div class="sideCardHeader">
-        <div>
-          <div class="sideCardTitle">Robot Console</div>
-          <div class="sideCardSub">Run the robot, reset pose, and manage the live connection.</div>
-        </div>
-      </div>
+      <div class="sideCardTitle">Robot Console</div>
 
       <div class="controlStack">
         <div class="controlSection">
