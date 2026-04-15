@@ -1,7 +1,13 @@
 # robot-field-ui
 
-Interactive 96x60 inch robot path planner with a browser UI, Raspberry Pi robot
+Browser-based robot path planner with a live field UI, Raspberry Pi robot
 server, and shared waypoint format for autonomous path testing.
+
+Live UI: `https://davidborsky.github.io/robot-field-ui/`
+
+The default layout is a 96x60 inch field, but the planner is not locked to that
+size. You can adapt the field dimensions, waypoint file, and robot endpoint for
+your own robot project.
 
 ## What this repo includes
 
@@ -23,6 +29,15 @@ server, and shared waypoint format for autonomous path testing.
 
 - `BRINGUP.md`
   First-hardware-day checklist for wiring, validation, and safe testing.
+
+## Customizing the field
+
+This project is meant to be reusable.
+
+- The default field is `96 x 60` inches.
+- You can change the field dimensions for a different course or robot space.
+- You can reuse the same UI with your own Raspberry Pi server by changing the robot API URL.
+- You can update `robot-paths.json` with your own saved paths and units.
 
 ## Quick start
 
