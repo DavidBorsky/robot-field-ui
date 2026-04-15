@@ -70,7 +70,7 @@ class FrontBackMotionState:
 
 
 class DifferentialOdometry:
-    """Tracks a 2D robot pose from wheel motion and optional gyro heading."""
+    """Tracks a 2D robot pose from wheel motion and optional external heading."""
 
     def __init__(self, track_width_in: float = TRACK_WIDTH_IN):
         if track_width_in <= 0:
@@ -96,8 +96,8 @@ class DifferentialOdometry:
         Args:
             left_distance_in: Incremental left wheel travel since last update.
             right_distance_in: Incremental right wheel travel since last update.
-            heading_deg: Optional absolute gyro heading. When provided, gyro
-                heading is trusted over wheel-derived heading drift.
+            heading_deg: Optional absolute heading override. When provided, it
+                is trusted over wheel-derived heading drift.
         """
         delta_center = (left_distance_in + right_distance_in) / 2.0
 
@@ -122,7 +122,7 @@ class FrontBackMecanumOdometry:
     This model assumes:
     - equal front/back wheel motion -> forward/back translation
     - opposite front/back wheel motion -> strafe translation
-    - heading comes from the gyro when available
+    - heading stays fixed unless an external heading override is provided
     """
 
     def __init__(

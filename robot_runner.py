@@ -12,7 +12,6 @@ from constants import (
     SIM_MAX_STEPS_PER_RUN,
 )
 from drivetrain import MotorCommand
-from gyro import SimulatedGyro, create_gyro
 from ir_sensor import EdgeSafetyController, IRSensorState
 from odom import FrontBackMecanumOdometry
 from path_follower import PathPoint, create_follower
@@ -131,7 +130,6 @@ def run_path(
     # Keep the runner on a simulated vision target path for now so it does not
     # fight the UI camera stream for the device handle during live runs.
     camera = SimulatedCamera()
-    gyro = create_gyro(simulate=simulate_connection)
     connection = create_connection(
         simulate=simulate_connection,
         port=serial_port,
@@ -157,8 +155,6 @@ def run_path(
                 connection.set_sensor_snapshot(connection.read_sensors().__class__(ir=simulated_ir, heading_deg=None))
                 sensor_snapshot = connection.read_sensors()
                 ir_state = sensor_snapshot.ir
-                if isinstance(gyro, SimulatedGyro):
-                    gyro.set_heading(heading_deg=odom.pose.heading_deg, angular_rate_dps=0.0)
                 if isinstance(camera, SimulatedCamera):
                     camera.set_target(
                         VisionTarget(
@@ -170,7 +166,6 @@ def run_path(
                         )
                     )
 
-            gyro_reading = gyro.read()
             frame = camera.read_frame()
             vision_target = camera.get_target()
 
@@ -187,7 +182,7 @@ def run_path(
                 front_rpm=sensor_snapshot.encoders.front_rpm,
                 back_rpm=sensor_snapshot.encoders.back_rpm,
                 dt=DEFAULT_CONTROL_DT_S,
-                heading_deg=reported_heading_deg if reported_heading_deg is not None else gyro_reading.heading_deg,
+                heading_deg=reported_heading_deg,
                 counts_per_rev=sensor_snapshot.encoders.counts_per_rev,
             )
             requested_command, debug = follower.update(pose=odom.pose)
@@ -202,7 +197,7 @@ def run_path(
                     odom.pose.y,
                     command.front_output,
                     command.back_output,
-                    gyro_reading.heading_deg,
+                    odom.pose.heading_deg,
                     frame.frame_id,
                     debug["lookahead_x"],
                     debug["lookahead_y"],
