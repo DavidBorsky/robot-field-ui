@@ -1,9 +1,9 @@
-# robot-field-ui
+# robot-field-console
 
 Browser-based robot path planner with a live field UI, Raspberry Pi robot
 server, and shared waypoint format for autonomous path testing.
 
-Live UI: `https://davidborsky.github.io/robot-field-ui/`
+Live UI: `https://davidborsky.github.io/robot-field-console/`
 
 The default layout is a 96x60 inch field, but the planner is not locked to that
 size. You can adapt the field dimensions, waypoint file, and robot endpoint for
@@ -118,7 +118,7 @@ This repo can also host the browser UI with GitHub Pages.
 Expected project URL:
 
 ```text
-https://davidborsky.github.io/robot-field-ui/
+https://davidborsky.github.io/robot-field-console/
 ```
 
 Once GitHub Pages is enabled for this repository, that link should load the same
